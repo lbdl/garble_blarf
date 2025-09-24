@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "memo-transcriber"
+version = "0.1.0"
+description = "Voice memo transcription tool"
+requires-python = ">=3.13"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.0.0",
+    "ruff>=0.1.0", 
+    "pytest>=7.0.0",
+]
+
+# Define console commands
+[project.scripts]
+memo-transcriber = "memo_transcriber.cli:main"
+transcribe = "memo_transcriber.cli:main"
+
+# Hatchling configuration (optional)
+[tool.hatch.build.targets.wheel]
+packages = ["src/memo_transcriber"]

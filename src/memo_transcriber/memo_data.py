@@ -169,6 +169,93 @@ def get_unassigned_recordings(folder_usage: Dict[Optional[int], int]) -> List[Un
     return unassigned
 
 
+def get_unassigned_recordings_direct(db_path: str) -> Tuple[List[UnassignedRecordings], int]:
+    """
+    Direct function to get unassigned recordings without needing the full analysis.
+    
+    Returns:
+        Tuple of (unassigned_recordings_list, total_unassigned_count)
+        
+    Usage:
+        unassigned_list, total_count = get_unassigned_recordings_direct(db_path)
+        
+        if total_count > 0:
+            print(f"Found {total_count} unassigned recordings:")
+            for group in unassigned_list:
+                print(f"  - {group}")
+    """
+    
+    _, usage = analyze_folder_usage(db_path)
+    unassigned = get_unassigned_recordings(usage)
+    total_count = sum(group.count for group in unassigned)
+    
+    return unassigned, total_count
+
+
+def list_unassigned_recording_details(db_path: str) -> List[Dict]:
+    """
+    Get detailed information about each unassigned recording.
+    
+    Returns:
+        List of dictionaries with recording details for unassigned recordings
+        
+    Usage:
+        unassigned_details = list_unassigned_recording_details(db_path)
+        
+        for recording in unassigned_details:
+            print(f"Recording: {recording['title']} (Duration: {recording['duration']}s)")
+            print(f"  Path: {recording['path']}")
+            print(f"  Date: {recording['date']}")
+    """
+    
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Query for recordings that are unassigned (ZFOLDER is NULL, 0, or negative)
+        query = """
+        SELECT 
+            Z_PK as pk,
+            ZCUSTOMLABEL as title,
+            ZENCRYPTEDTITLE as plain_name,
+            ZPATH as path,
+            ZDURATION as duration,
+            ZDATE as date_timestamp,
+            ZFOLDER as folder_id,
+            ZUNIQUEID as unique_id,
+            datetime(ZDATE + 978307200, 'unixepoch') as formatted_date
+        FROM ZCLOUDRECORDING 
+        WHERE ZFOLDER IS NULL 
+           OR ZFOLDER = 0 
+           OR ZFOLDER < 0
+        ORDER BY ZDATE DESC
+        """
+        
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        
+        recordings = []
+        for row in rows:
+            recordings.append({
+                'pk': row['pk'],
+                'title': row['title'] or 'Untitled',
+                'name': row['plain_name'] or 'Unnamed',
+                'path': row['path'] or '',
+                'duration': row['duration'] or 0.0,
+                'date_timestamp': row['date_timestamp'],
+                'formatted_date': row['formatted_date'],
+                'folder_id': row['folder_id'],
+                'unique_id': row['unique_id'] or '',
+            })
+            
+        return recordings
+        
+    finally:
+        conn.close()
+
+
 # Test function to validate our understanding
 def print_folder_analysis(db_path: str):
     """Debug function to print folder structure analysis."""
@@ -193,9 +280,9 @@ def print_folder_analysis(db_path: str):
         print(f"    Stored count: {stored_count}, Actual count: {actual_count}")
         print(f"    UUID: {folder.uuid}")
         if actual_count != stored_count:
-            print(f"    ⚠️  Count mismatch - database may need maintenance")
+            print("    ⚠️  Count mismatch - database may need maintenance")
         print()
-        
+
         assigned_recordings += actual_count
 
 
@@ -226,6 +313,70 @@ def print_folder_analysis(db_path: str):
         for orphaned_id in orphaned_folder_ids:
             if orphaned_id is not None and orphaned_id > 0:
                 print(f"    Folder ID {orphaned_id}: {usage[orphaned_id]} recordings")
+
+
+# Example usage functions
+def example_usage_patterns(db_path: str):
+    """
+    Demonstrates different ways to work with unassigned recordings.
+    """
+    
+    print("=== EXAMPLE USAGE PATTERNS ===\n")
+    
+    # Method 1: Quick check for unassigned recordings
+    print("1. Quick unassigned check:")
+    unassigned_list, total_count = get_unassigned_recordings_direct(db_path)
+    
+    if total_count > 0:
+        print(f"   ⚠️  Found {total_count} unassigned recordings")
+        for group in unassigned_list:
+            print(f"   - {group}")
+    else:
+        print("   ✓ All recordings are properly assigned to folders")
+    
+    print()
+    
+    # Method 2: Get detailed information about unassigned recordings
+    print("2. Detailed unassigned recording info:")
+    unassigned_details = list_unassigned_recording_details(db_path)
+    
+    if unassigned_details:
+        print(f"   Found {len(unassigned_details)} unassigned recordings:")
+        for i, recording in enumerate(unassigned_details[:3]):  # Show first 3
+            print(f"   [{i+1}] '{recording['name']}'")
+            print(f"       Duration: {recording['duration']:.1f}s")
+            print(f"       Date: {recording['formatted_date']}")
+            print(f"       Path: {recording['path']}")
+            print(f"       Folder ID: {recording['folder_id']}")
+        
+        if len(unassigned_details) > 3:
+            print(f"   ... and {len(unassigned_details) - 3} more")
+    else:
+        print("   ✓ No unassigned recordings found")
+    
+    print()
+    
+    # Method 3: Full analysis (what we had before)
+    print("3. Full folder analysis:")
+    print("   (This gives you the complete picture)")
+    print_folder_analysis(db_path)
+
+
+def check_for_unassigned_only(db_path: str) -> bool:
+    """
+    Simple boolean check: are there any unassigned recordings?
+    
+    Returns:
+        True if there are unassigned recordings, False otherwise
+        
+    Usage:
+        if check_for_unassigned_only(db_path):
+            print("Need to handle unassigned recordings")
+            # ... do something about it
+    """
+    
+    _, total_count = get_unassigned_recordings_direct(db_path)
+    return total_count > 0
 
 
 if __name__ == "__main__":
