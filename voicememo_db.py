@@ -1,3 +1,9 @@
+"""
+voicememo_db
+
+Searches for a voicememo db in the ususal location, this is noteworthy:
+    `~/Library/G
+"""
 import sqlite3
 import os
 from pathlib import Path
