@@ -2,7 +2,7 @@ import sqlite3
 import os
 from pathlib import Path
 
-def check_db_access():
+def _check_db_access():
     """Check if we can access the Voice Memos database"""
     containers = "Library/Group Containers"
     voice_memo_base = "group.com.apple.VoiceMemos.shared/Recordings"
@@ -29,11 +29,62 @@ def check_db_access():
         return False, ""
 
 def get_db_path():
-    fp = check_db_access()
-    if fp[0] == True:
-        return fp[1]
-        
+    fp = _check_db_access()
+    return fp[1]
 
+
+def get_schema():
+    """Find out what tables and columns exist"""
+    db_path = get_db_path()
+    
+    with sqlite3.connect(str(db_path)) as conn:
+        # Get all tables
+        tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        print("Tables found:")
+        for table in tables:
+            print(f"  - {table[0]}")
+        
+        # Get column info for each table
+        for table in tables:
+            table_name = table[0]
+            print(f"\nColumns in {table_name}:")
+            columns = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+            for col in columns:
+                print(f"  - {col[1]} ({col[2]})")
+
+
+def get_memo_files():
+    """Get voice memo file paths and metadata from database"""
+    db_path = get_db_path()
+    
+    with sqlite3.connect(str(db_path)) as conn:
+        cursor = conn.execute("""
+            SELECT 
+                ZUNIQUEID,
+                ZCUSTOMLABEL,
+                ZENCRYPTEDTITLE, 
+                ZPATH,
+                ZDURATION,
+                ZDATE
+            FROM ZCLOUDRECORDING 
+            WHERE ZPATH IS NOT NULL
+            ORDER BY ZDATE DESC
+        """)
+        
+        recordings = []
+        for row in cursor.fetchall():
+            recording = {
+                'unique_id': row[0],
+                'custom_label': row[1], # this seems to map to a date stamp
+                'encrypted_title': row[2], # in fact the DE crypted title 
+                'path': row[3], 
+                'duration': row[4],
+                'date': row[5] # float number
+            }
+            recordings.append(recording)
+        
+        return recordings
 
 if __name__ == "__main__":
-    print(f"{get_db_path()}")
+    import sys
+    globals()[sys.argv[1]]()
