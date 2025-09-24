@@ -1,5 +1,5 @@
 import sqlite3
-from voicememo_db import get_db_path
+from .voicememo_db import get_db_path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 

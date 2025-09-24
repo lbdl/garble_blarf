@@ -19,11 +19,11 @@ def _check_db_access():
     
     if not db_path.exists():
         print("❌ Database file not found")
-        return False
+        return False, "❌ Database file not found"
     
     if not os.access(db_path, os.R_OK):
         print("❌ No read permission")
-        return False
+        return False, "❌ No read permission"
     
     try:
         with sqlite3.connect(str(db_path)) as conn:
@@ -32,11 +32,16 @@ def _check_db_access():
         return True, db_path 
     except sqlite3.OperationalError as e:
         print(f"❌ Cannot open database: {e}")
-        return False, ""
+        return False, f"❌ Cannot open database: {e}"
 
 def get_db_path():
     fp = _check_db_access()
     return fp[1]
+
+
+def cli_get_db_path():
+    fp = _check_db_access()
+    return fp
 
 
 def get_schema():
