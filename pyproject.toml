@@ -20,7 +20,8 @@ dev = [
 [project.scripts]
 memo-transcriber = "memo_transcriber.cli:main"
 transcribe = "memo_transcriber.cli:main"
-show_example = "memo_transcriber.cli:example"
+show_folders = "memo_transcriber.cli:example"
+show_files = "memo_transcriber.cli:filetree"
 
 # Hatchling configuration (optional)
 [tool.hatch.build.targets.wheel]
