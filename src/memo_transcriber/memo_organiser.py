@@ -53,7 +53,7 @@ class MemoOrganiser:
         Args:
             memo_files: List of VoiceMemoFile objects
             transcribe: Whether to transcribe audio files
-            skip_missing: Whether to skip files that don't exist
+            skip_missing: Whether to skip files that cannot be found (they may not be synced)
             framework: True for Apple Speech framework, False for local model
             max_duration_minutes: Skip files longer than this (in minutes)
 
@@ -97,13 +97,14 @@ class MemoOrganiser:
 
             # Check if file exists
             if not full_path.exists():
+                # TODO: this is largely pointless skip if missing is a bit shite, remove
                 if skip_missing:
                     organised.append(OrganisedMemo(
                         file_path=str(full_path),
                         plain_title=memo.plain_title,
                         folder=memo.memo_folder,
                         uuid=memo.uuid,
-                        transcription="",
+                        transcription=f"skipping: file not found, may not be synced?",
                         status="skipped",
                         date=memo.recording_date
                     ))
@@ -116,7 +117,7 @@ class MemoOrganiser:
                         plain_title=memo.plain_title,
                         folder=memo.memo_folder,
                         uuid=memo.uuid,
-                        transcription=f"File not found: {full_path}",
+                        transcription=f"File not found: {full_path}, may not be synced",
                         status="failed",
                         date=memo.recording_date
                     ))
@@ -223,6 +224,7 @@ class MemoOrganiser:
 
     def save_transcriptions_to_dict(self, organised_memos: List[OrganisedMemo]) -> Dict[str, Dict]:
         """Convert organised memos to dictionary format for JSON export."""
+        # TODO add the recording date
         return {
             memo.uuid: {
                 'title': memo.plain_title,
