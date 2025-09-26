@@ -38,11 +38,15 @@ def get_db_path():
     fp = _check_db_access()
     return fp[1]
 
-
 def cli_get_db_path():
     fp = _check_db_access()
     return fp
 
+def cli_get_rec_path():
+    containers = "Library/Group Containers"
+    voice_memo_base = "group.com.apple.VoiceMemos.shared/Recordings"
+    rc_path = Path.home() / containers / voice_memo_base 
+    return rc_path
 
 def get_schema():
     """Find out what tables and columns exist"""

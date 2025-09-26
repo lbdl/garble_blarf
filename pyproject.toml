@@ -7,7 +7,7 @@ name = "memo-transcriber"
 version = "0.1.0"
 description = "Voice memo transcription tool"
 requires-python = ">=3.13"
-dependencies = [click, openai-whisper, pyobjc-framework-Speech]
+dependencies = [click, openai-whisper, pyobjc-framework-Speech, pyobjc-framework-AVFoundation]
 
 [project.optional-dependencies]
 dev = [

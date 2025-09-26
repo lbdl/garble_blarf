@@ -6,8 +6,10 @@ cli implementaion for package:
 import sys
 import click
 from .voice_memos_printer import VoiceMemosPrinter
-from .voicememo_db import cli_get_db_path
+from .voicememo_db import cli_get_db_path, cli_get_rec_path
 from .memo_data import get_memo_data
+from pathlib import Path
+from .transcriber import transcribe_file as transcribe_audio
 
 def _get_db():
     db_path = cli_get_db_path()
@@ -32,5 +34,13 @@ def filetree():
     records = get_memo_data(db_path)
     VoiceMemosPrinter.print_memo_files(records)
 
-
+@main.command
+def transcribe_file():
+    fp_base = cli_get_rec_path()
+    testfile = "20180114 132606-76050490.m4a"
+    testfile2 = "20170421 092405-852A1FFE.m4a"
+    fp = fp_base / testfile
+    fp2 = fp_base / testfile2
+    res = transcribe_audio(str(fp2))
+    print(f"{res}")
 
