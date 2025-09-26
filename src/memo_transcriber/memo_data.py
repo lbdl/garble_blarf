@@ -1,19 +1,36 @@
 import sqlite3
-from .voicememo_db import get_db_path
+from .voicememo_db import get_db_path, get_memos_with_folders
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
+
+
+
+@dataclass
+class VoiceMemoFile:
+    """Represents a Voice Memo file with its metadata."""
+    uuid: str
+    encrypted_name: str
+    f_path: str
+    memo_folder: str
+
+    def __str__(self) -> str:
+        return (f"File: name='{self.encrypted_name}', "
+                        f"uuid={self.uuid}, "
+                        f"folder={self.memo_folder}, "
+                        f"path={self.f_path}")
+
 
 @dataclass
 class VoiceMemoFolder:
     """Represents a Voice Memos folder with its metadata."""
     pk: int
-    encrypted_name: str
+    plain_name: str
     uuid: str
     rank: int
     recording_count: int
 
     def __str__(self) -> str:
-        return f"Folder(id={self.pk}, name='{self.encrypted_name}', recordings={self.recording_count})"
+        return f"Folder(id={self.uuid}, name='{self.plain_name}', recordings={self.recording_count})"
 
 
 @dataclass
@@ -25,6 +42,23 @@ class UnassignedRecordings:
     def __str__(self) -> str:
         folder_desc = "NULL" if self.folder_id is None else str(self.folder_id)
         return f"Unassigned(folder_id={folder_desc}, recordings={self.count})"
+
+
+def get_memo_data(db_path: str) -> List[VoiceMemoFile]:
+    memos = get_memos_with_folders(db_path)
+    memo_files = []
+
+    for record in memos:
+        memo = VoiceMemoFile(
+            uuid=record['recording_id'] or '',
+            encrypted_name=record['title'] or 'Untitled',
+            f_path=record['file_path'] or '',
+            memo_folder=record['folder_name'] or 'Unassigned'
+        )
+        memo_files.append(memo)
+
+    return memo_files
+
 
 
 def query_folder_structure(db_path: str) -> Dict[int, VoiceMemoFolder]:
@@ -55,7 +89,7 @@ def query_folder_structure(db_path: str) -> Dict[int, VoiceMemoFolder]:
         query = """
         SELECT 
             Z_PK as pk,
-            ZENCRYPTEDNAME as encrypted_name,
+            ZENCRYPTEDNAME as plain_name,
             ZUUID as uuid,
             ZRANK as rank,
             ZCOUNTOFRECORDINGS as recording_count
@@ -70,7 +104,7 @@ def query_folder_structure(db_path: str) -> Dict[int, VoiceMemoFolder]:
         for row in rows:
             folder = VoiceMemoFolder(
                 pk=row['pk'],
-                encrypted_name=row['encrypted_name'] or 'Unnamed',
+                plain_name=row['plain_name'] or 'Unnamed',
                 uuid=row['uuid'] or '',
                 rank=row['rank'] or 0,
                 recording_count=row['recording_count'] or 0
@@ -82,7 +116,7 @@ def query_folder_structure(db_path: str) -> Dict[int, VoiceMemoFolder]:
     finally:
         conn.close()
 
-def analyze_folder_usage(db_path: str) -> Tuple[Dict[int, VoiceMemoFolder], Dict[int, int]]:
+def analyze_folder_usage(db_path: str) -> Tuple[Dict[int, VoiceMemoFolder], Dict[Optional[int], int]]:
     """
     Analyze how recordings are distributed across folders.
     
@@ -169,29 +203,6 @@ def get_unassigned_recordings(folder_usage: Dict[Optional[int], int]) -> List[Un
     return unassigned
 
 
-def get_unassigned_recordings_direct(db_path: str) -> Tuple[List[UnassignedRecordings], int]:
-    """
-    Direct function to get unassigned recordings without needing the full analysis.
-    
-    Returns:
-        Tuple of (unassigned_recordings_list, total_unassigned_count)
-        
-    Usage:
-        unassigned_list, total_count = get_unassigned_recordings_direct(db_path)
-        
-        if total_count > 0:
-            print(f"Found {total_count} unassigned recordings:")
-            for group in unassigned_list:
-                print(f"  - {group}")
-    """
-    
-    _, usage = analyze_folder_usage(db_path)
-    unassigned = get_unassigned_recordings(usage)
-    total_count = sum(group.count for group in unassigned)
-    
-    return unassigned, total_count
-
-
 def list_unassigned_recording_details(db_path: str) -> List[Dict]:
     """
     Get detailed information about each unassigned recording.
@@ -254,129 +265,6 @@ def list_unassigned_recording_details(db_path: str) -> List[Dict]:
         
     finally:
         conn.close()
-
-
-# Test function to validate our understanding
-def print_folder_analysis(db_path: str):
-    """Debug function to print folder structure analysis."""
-
-    folders, usage = analyze_folder_usage(db_path)
-    unassigned = get_unassigned_recordings(usage)
-
-    print("=== FOLDER STRUCTURE ANALYSIS ===")
-    print(f"Total folders found: {len(folders)}")
-    print(f"Total folder assignments tracked: {len(usage)}")
-    print()
-
-    # Print assigned folders
-    print("--- ASSIGNED FOLDERS ---")
-    assigned_recordings = 0
-    for folder_id, folder in folders.items():
-        actual_count = usage.get(folder_id, 0)
-        stored_count = folder.recording_count
-        status = "✓" if actual_count == stored_count else "⚠️"
-
-        print(f"{status} {folder}")
-        print(f"    Stored count: {stored_count}, Actual count: {actual_count}")
-        print(f"    UUID: {folder.uuid}")
-        if actual_count != stored_count:
-            print("    ⚠️  Count mismatch - database may need maintenance")
-        print()
-
-        assigned_recordings += actual_count
-
-
-    # Print unassigned recordings
-    print("--- UNASSIGNED RECORDINGS ---")
-    total_unassigned = 0
-    if unassigned:
-        for unassigned_group in unassigned:
-            print(f"📁 {unassigned_group}")
-            total_unassigned += unassigned_group.count
-    else:
-        print("✓ No unassigned recordings found")
-
-    print()
-    print("--- SUMMARY ---")
-    total_recordings = assigned_recordings + total_unassigned
-    print(f"Total recordings: {total_recordings}")
-    print(f"  - In folders: {assigned_recordings}")
-    print(f"  - Unassigned: {total_unassigned}")
-    
-    if total_unassigned > 0:
-        print(f"  - Unassigned percentage: {(total_unassigned/total_recordings)*100:.1f}%")
-    
-    # Check for any folder IDs in usage that aren't in folders table
-    orphaned_folder_ids = set(usage.keys()) - set(folders.keys()) - {None, 0}
-    if orphaned_folder_ids:
-        print(f"\n⚠️  Found recordings assigned to non-existent folder IDs: {orphaned_folder_ids}")
-        for orphaned_id in orphaned_folder_ids:
-            if orphaned_id is not None and orphaned_id > 0:
-                print(f"    Folder ID {orphaned_id}: {usage[orphaned_id]} recordings")
-
-
-# Example usage functions
-def example_usage_patterns(db_path: str):
-    """
-    Demonstrates different ways to work with unassigned recordings.
-    """
-    
-    print("=== EXAMPLE USAGE PATTERNS ===\n")
-    
-    # Method 1: Quick check for unassigned recordings
-    print("1. Quick unassigned check:")
-    unassigned_list, total_count = get_unassigned_recordings_direct(db_path)
-    
-    if total_count > 0:
-        print(f"   ⚠️  Found {total_count} unassigned recordings")
-        for group in unassigned_list:
-            print(f"   - {group}")
-    else:
-        print("   ✓ All recordings are properly assigned to folders")
-    
-    print()
-    
-    # Method 2: Get detailed information about unassigned recordings
-    print("2. Detailed unassigned recording info:")
-    unassigned_details = list_unassigned_recording_details(db_path)
-    
-    if unassigned_details:
-        print(f"   Found {len(unassigned_details)} unassigned recordings:")
-        for i, recording in enumerate(unassigned_details[:3]):  # Show first 3
-            print(f"   [{i+1}] '{recording['name']}'")
-            print(f"       Duration: {recording['duration']:.1f}s")
-            print(f"       Date: {recording['formatted_date']}")
-            print(f"       Path: {recording['path']}")
-            print(f"       Folder ID: {recording['folder_id']}")
-        
-        if len(unassigned_details) > 3:
-            print(f"   ... and {len(unassigned_details) - 3} more")
-    else:
-        print("   ✓ No unassigned recordings found")
-    
-    print()
-    
-    # Method 3: Full analysis (what we had before)
-    print("3. Full folder analysis:")
-    print("   (This gives you the complete picture)")
-    print_folder_analysis(db_path)
-
-
-def check_for_unassigned_only(db_path: str) -> bool:
-    """
-    Simple boolean check: are there any unassigned recordings?
-    
-    Returns:
-        True if there are unassigned recordings, False otherwise
-        
-    Usage:
-        if check_for_unassigned_only(db_path):
-            print("Need to handle unassigned recordings")
-            # ... do something about it
-    """
-    
-    _, total_count = get_unassigned_recordings_direct(db_path)
-    return total_count > 0
 
 
 if __name__ == "__main__":

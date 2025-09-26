@@ -63,6 +63,51 @@ def get_schema():
             for col in columns:
                 print(f"  - {col[1]} ({col[2]})")
 
+def get_memos_with_folders(db_path: str):
+    """Get voice memo filename paths and folders from the metadata db_path
+    """
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    
+    query = """
+    SELECT 
+        r.ZUNIQUEID as recording_id,
+        r.ZCUSTOMLABEL as recording_title,
+        r.ZENCRYPTEDTITLE as encrypted_title, 
+        r.ZPATH as file_path,
+        r.ZDURATION as duration_seconds,
+        r.ZDATE as date_timestamp,
+        r.ZFOLDER as folder_id,
+        f.ZENCRYPTEDNAME as folder_name,
+        f.ZUUID as folder_uuid,
+        CASE 
+            WHEN f.ZENCRYPTEDNAME IS NULL THEN 'Unassigned'
+            ELSE f.ZENCRYPTEDNAME 
+        END as display_folder_name
+    FROM ZCLOUDRECORDING r
+    LEFT JOIN ZFOLDER f ON r.ZFOLDER = f.Z_PK
+    WHERE r.ZPATH IS NOT NULL
+    ORDER BY r.ZDATE DESC
+    """
+    
+    cursor = conn.cursor()
+    cursor.execute(query)
+    
+    recordings = []
+    for row in cursor.fetchall():
+        recordings.append({
+            'recording_id': row['recording_id'],
+            'title': row['recording_title'] or 'Untitled',
+            'file_path': row['file_path'],
+            'duration': row['duration'],
+            'date_timestamp': row['date_timestamp'],
+            'folder_id': row['folder_id'],
+            'folder_name': row['folder_name'] or 'Unassigned',
+            'folder_uuid': row['folder_uuid']
+        })
+    
+    conn.close()
+    return recordings
 
 def get_memo_files():
     """Get voice memo file paths and metadata from database"""
@@ -76,7 +121,8 @@ def get_memo_files():
                 ZENCRYPTEDTITLE, 
                 ZPATH,
                 ZDURATION,
-                ZDATE
+                ZDATE,
+                ZFOLDER,
             FROM ZCLOUDRECORDING 
             WHERE ZPATH IS NOT NULL
             ORDER BY ZDATE DESC
