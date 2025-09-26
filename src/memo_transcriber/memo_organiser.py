@@ -26,6 +26,7 @@ class OrganisedMemo:
     uuid: str
     transcription: str
     status: str  # 'success', 'failed', 'skipped'
+    date: str
 
     def __str__(self) -> str:
         return (f"Memo: '{self.plain_title}' "
@@ -36,9 +37,10 @@ class OrganisedMemo:
 class MemoOrganiser:
     """Organises voice memos with transcriptions."""
 
-    def __init__(self, recordings_base_path: str = ''):
-        """Initialize with optional custom recordings path."""
+    def __init__(self, recordings_base_path: str = '', output: str = 'Documents/transcripions'):
+        """Initialize with optional custom recordings path and output folder"""
         self.recordings_base = Path(recordings_base_path) if recordings_base_path else cli_get_rec_path()
+        self.recordings_base = output
 
     def organise_memos(self, memo_files: List[VoiceMemoFile],
                       transcribe: bool = True,
@@ -60,10 +62,12 @@ class MemoOrganiser:
         """
         organised = []
 
-        # Create progress bar if tqdm is available
+        # Create single progress bar if tqdm is available
         if HAS_TQDM and transcribe:
-            iterator = tqdm(memo_files, desc="Processing memos", unit="file")
+            progress_bar = tqdm(total=len(memo_files), desc="", unit="file", position=1, leave=True)
+            iterator = memo_files
         else:
+            progress_bar = None
             iterator = memo_files
             if transcribe:
                 print(f"Processing {len(memo_files)} memo files...")
@@ -81,8 +85,11 @@ class MemoOrganiser:
                     folder=memo.memo_folder,
                     uuid=memo.uuid,
                     transcription=f"Skipped: too long ({duration_minutes:.1f} min > {max_duration_minutes} min)",
-                    status="skipped"
+                    status="skipped",
+                    date=memo.recording_date
                 ))
+                if progress_bar:
+                    progress_bar.update(1)
                 continue
 
             # Construct full file path
@@ -97,8 +104,11 @@ class MemoOrganiser:
                         folder=memo.memo_folder,
                         uuid=memo.uuid,
                         transcription="",
-                        status="skipped"
+                        status="skipped",
+                        date=memo.recording_date
                     ))
+                    if progress_bar:
+                        progress_bar.update(1)
                     continue
                 else:
                     organised.append(OrganisedMemo(
@@ -107,8 +117,11 @@ class MemoOrganiser:
                         folder=memo.memo_folder,
                         uuid=memo.uuid,
                         transcription=f"File not found: {full_path}",
-                        status="failed"
+                        status="failed",
+                        date=memo.recording_date
                     ))
+                    if progress_bar:
+                        progress_bar.update(1)
                     continue
 
             # Get transcription if requested
@@ -118,9 +131,10 @@ class MemoOrganiser:
             if transcribe:
                 processed_count += 1
 
-                # Show per-file progress
-                if HAS_TQDM and hasattr(iterator, 'set_description'):
-                    iterator.set_description(f"[{processed_count}/{len(memo_files)}] {memo.plain_title[:30]}...")
+                # Display current file name above progress bar
+                if progress_bar:
+                    # Use tqdm.write to print above the progress bar
+                    progress_bar.write(f"Processing: {memo.plain_title}")
                 else:
                     elapsed = time.time() - start_time
                     if processed_count > 1:
@@ -131,28 +145,22 @@ class MemoOrganiser:
                     else:
                         print(f"[{processed_count}/{len(memo_files)}] Transcribing: {memo.plain_title}")
 
-                # Show file duration
-                duration_min = memo.duration_seconds / 60.0
-                print(f"   📏 Duration: {duration_min:.1f} minutes")
-
-                file_start_time = time.time()
                 try:
                     transcription = transcribe_file(str(full_path))
-                    file_elapsed = time.time() - file_start_time
-                    print(f"   ✅ Completed in {file_elapsed:.1f}s")
 
                     # Check if transcription indicates an error
                     if transcription.startswith(("Transcription error:", "Recognition failed:", "Speech recognition not available")):
                         status = "failed"
-                        print(f"   ❌ Failed: {transcription}")
                 except Exception as e:
-                    file_elapsed = time.time() - file_start_time
                     transcription = f"Transcription error: {str(e)}"
                     status = "failed"
-                    print(f"   ❌ Failed after {file_elapsed:.1f}s: {str(e)}")
             else:
                 transcription = "[Transcription not requested]"
                 status = "skipped"
+
+            # Update progress bar
+            if progress_bar:
+                progress_bar.update(1)
 
             organised.append(OrganisedMemo(
                 file_path=str(full_path),
@@ -160,8 +168,13 @@ class MemoOrganiser:
                 folder=memo.memo_folder,
                 uuid=memo.uuid,
                 transcription=transcription,
-                status=status
+                status=status,
+                date=memo.recording_date
             ))
+
+        # Close progress bar
+        if progress_bar:
+            progress_bar.close()
 
         return organised
 
