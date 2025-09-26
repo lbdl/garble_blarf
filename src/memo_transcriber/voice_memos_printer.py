@@ -4,11 +4,7 @@ VoiceMemosPrinter - Helper class for printing Voice Memos database data in a for
 
 from typing import Dict, List
 from .memo_data import analyze_folder_usage, get_unassigned_recordings, list_unassigned_recording_details
-
-# Forward references for type hints
-if False:  # TYPE_CHECKING would be better but keeping it simple
-    from .memo_data import VoiceMemoFile, VoiceMemoFolder, UnassignedRecordings
-
+from .memo_data import VoiceMemoFile, VoiceMemoFolder, UnassignedRecordings
 
 class VoiceMemosPrinter:
     """Helper class for printing Voice Memos database data in a formatted way."""
@@ -17,14 +13,19 @@ class VoiceMemosPrinter:
     def print_memo_files(memo_files: List['VoiceMemoFile']) -> None:
         """Print all voice memo files with their details."""
         if not memo_files:
-            print("No memo files found.")
+            print("📁 No memo files found.")
             return
 
-        print(f"Found {len(memo_files)} voice memo files:")
-        print("-" * 60)
+        print(f"🎙️  Found {len(memo_files)} voice memo files:")
+        print("=" * 70)
+        print()
 
-        for memo in memo_files:
-            print(memo)
+        for i, memo in enumerate(memo_files, 1):
+            print(f"[{i:3d}] 🎵 {memo.plain_title}")
+            print(f"      📁 Folder: {memo.memo_folder}")
+            print(f"      🆔 UUID: {memo.uuid}")
+            print(f"      📄 Path: {memo.f_path}")
+            print("-" * 70)
 
     @staticmethod
     def print_folders(folders: Dict[int, 'VoiceMemoFolder']) -> None:

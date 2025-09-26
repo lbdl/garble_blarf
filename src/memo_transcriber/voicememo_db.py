@@ -2,7 +2,7 @@
 voicememo_db
 
 Searches for a voicememo db in the ususal location, this is noteworthy:
-    `~/Library/G
+    `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings
 """
 import sqlite3
 import os
@@ -73,7 +73,7 @@ def get_memos_with_folders(db_path: str):
     SELECT 
         r.ZUNIQUEID as recording_id,
         r.ZCUSTOMLABEL as recording_title,
-        r.ZENCRYPTEDTITLE as encrypted_title, 
+        r.ZENCRYPTEDTITLE as plain_title, 
         r.ZPATH as file_path,
         r.ZDURATION as duration_seconds,
         r.ZDATE as date_timestamp,
@@ -97,9 +97,9 @@ def get_memos_with_folders(db_path: str):
     for row in cursor.fetchall():
         recordings.append({
             'recording_id': row['recording_id'],
-            'title': row['recording_title'] or 'Untitled',
+            'plain_title': row['plain_title'] or 'Untitled',
             'file_path': row['file_path'],
-            'duration': row['duration'],
+            'duration_seconds': row['duration_seconds'],
             'date_timestamp': row['date_timestamp'],
             'folder_id': row['folder_id'],
             'folder_name': row['folder_name'] or 'Unassigned',

@@ -7,6 +7,7 @@ import sys
 import click
 from .voice_memos_printer import VoiceMemosPrinter
 from .voicememo_db import cli_get_db_path
+from .memo_data import get_memo_data
 
 def _get_db():
     db_path = cli_get_db_path()
@@ -25,7 +26,11 @@ def example():
     db_path = _get_db()
     VoiceMemosPrinter.example_usage_patterns(db_path)
 
+@main.command
 def filetree():
     db_path = _get_db()
+    records = get_memo_data(db_path)
+    VoiceMemosPrinter.print_memo_files(records)
+
 
 

@@ -9,12 +9,12 @@ from dataclasses import dataclass
 class VoiceMemoFile:
     """Represents a Voice Memo file with its metadata."""
     uuid: str
-    encrypted_name: str
+    plain_title: str
     f_path: str
     memo_folder: str
 
     def __str__(self) -> str:
-        return (f"File: name='{self.encrypted_name}', "
+        return (f"File: name='{self.plain_title}', "
                         f"uuid={self.uuid}, "
                         f"folder={self.memo_folder}, "
                         f"path={self.f_path}")
@@ -51,7 +51,7 @@ def get_memo_data(db_path: str) -> List[VoiceMemoFile]:
     for record in memos:
         memo = VoiceMemoFile(
             uuid=record['recording_id'] or '',
-            encrypted_name=record['title'] or 'Untitled',
+            plain_title=record['plain_title'] or 'Untitled',
             f_path=record['file_path'] or '',
             memo_folder=record['folder_name'] or 'Unassigned'
         )
