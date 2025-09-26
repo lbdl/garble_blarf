@@ -1,0 +1,223 @@
+"""
+Memo Organiser - Processes voice memo files and creates structured transcription data.
+"""
+
+from typing import List, Dict
+from dataclasses import dataclass
+from pathlib import Path
+import time
+from .memo_data import VoiceMemoFile
+from .transcriber import transcribe_file
+from .voicememo_db import cli_get_rec_path
+
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+
+
+@dataclass
+class OrganisedMemo:
+    """Structured memo data with transcription."""
+    file_path: str
+    plain_title: str
+    folder: str
+    uuid: str
+    transcription: str
+    status: str  # 'success', 'failed', 'skipped'
+
+    def __str__(self) -> str:
+        return (f"Memo: '{self.plain_title}' "
+                f"[{self.status}] "
+                f"({len(self.transcription)} chars)")
+
+
+class MemoOrganiser:
+    """Organises voice memos with transcriptions."""
+
+    def __init__(self, recordings_base_path: str = ''):
+        """Initialize with optional custom recordings path."""
+        self.recordings_base = Path(recordings_base_path) if recordings_base_path else cli_get_rec_path()
+
+    def organise_memos(self, memo_files: List[VoiceMemoFile],
+                      transcribe: bool = True,
+                      skip_missing: bool = True,
+                      framework: bool = True,
+                      max_duration_minutes: float = 8.0) -> List[OrganisedMemo]:
+        """
+        Organise memo files with transcriptions.
+
+        Args:
+            memo_files: List of VoiceMemoFile objects
+            transcribe: Whether to transcribe audio files
+            skip_missing: Whether to skip files that don't exist
+            framework: True for Apple Speech framework, False for local model
+            max_duration_minutes: Skip files longer than this (in minutes)
+
+        Returns:
+            List of OrganisedMemo objects
+        """
+        organised = []
+
+        # Create progress bar if tqdm is available
+        if HAS_TQDM and transcribe:
+            iterator = tqdm(memo_files, desc="Processing memos", unit="file")
+        else:
+            iterator = memo_files
+            if transcribe:
+                print(f"Processing {len(memo_files)} memo files...")
+
+        start_time = time.time()
+        processed_count = 0
+
+        for memo in iterator:
+            # Check duration first (convert to minutes)
+            duration_minutes = memo.duration_seconds / 60.0
+            if duration_minutes > max_duration_minutes:
+                organised.append(OrganisedMemo(
+                    file_path=memo.f_path,
+                    plain_title=memo.plain_title,
+                    folder=memo.memo_folder,
+                    uuid=memo.uuid,
+                    transcription=f"Skipped: too long ({duration_minutes:.1f} min > {max_duration_minutes} min)",
+                    status="skipped"
+                ))
+                continue
+
+            # Construct full file path
+            full_path = self.recordings_base / memo.f_path
+
+            # Check if file exists
+            if not full_path.exists():
+                if skip_missing:
+                    organised.append(OrganisedMemo(
+                        file_path=str(full_path),
+                        plain_title=memo.plain_title,
+                        folder=memo.memo_folder,
+                        uuid=memo.uuid,
+                        transcription="",
+                        status="skipped"
+                    ))
+                    continue
+                else:
+                    organised.append(OrganisedMemo(
+                        file_path=str(full_path),
+                        plain_title=memo.plain_title,
+                        folder=memo.memo_folder,
+                        uuid=memo.uuid,
+                        transcription=f"File not found: {full_path}",
+                        status="failed"
+                    ))
+                    continue
+
+            # Get transcription if requested
+            transcription = ""
+            status = "success"
+
+            if transcribe:
+                processed_count += 1
+
+                # Show per-file progress
+                if HAS_TQDM and hasattr(iterator, 'set_description'):
+                    iterator.set_description(f"[{processed_count}/{len(memo_files)}] {memo.plain_title[:30]}...")
+                else:
+                    elapsed = time.time() - start_time
+                    if processed_count > 1:
+                        avg_time = elapsed / (processed_count - 1)
+                        remaining = avg_time * (len(memo_files) - processed_count)
+                        print(f"[{processed_count}/{len(memo_files)}] Transcribing: {memo.plain_title} "
+                              f"(~{remaining:.0f}s remaining)")
+                    else:
+                        print(f"[{processed_count}/{len(memo_files)}] Transcribing: {memo.plain_title}")
+
+                # Show file duration
+                duration_min = memo.duration_seconds / 60.0
+                print(f"   📏 Duration: {duration_min:.1f} minutes")
+
+                file_start_time = time.time()
+                try:
+                    transcription = transcribe_file(str(full_path))
+                    file_elapsed = time.time() - file_start_time
+                    print(f"   ✅ Completed in {file_elapsed:.1f}s")
+
+                    # Check if transcription indicates an error
+                    if transcription.startswith(("Transcription error:", "Recognition failed:", "Speech recognition not available")):
+                        status = "failed"
+                        print(f"   ❌ Failed: {transcription}")
+                except Exception as e:
+                    file_elapsed = time.time() - file_start_time
+                    transcription = f"Transcription error: {str(e)}"
+                    status = "failed"
+                    print(f"   ❌ Failed after {file_elapsed:.1f}s: {str(e)}")
+            else:
+                transcription = "[Transcription not requested]"
+                status = "skipped"
+
+            organised.append(OrganisedMemo(
+                file_path=str(full_path),
+                plain_title=memo.plain_title,
+                folder=memo.memo_folder,
+                uuid=memo.uuid,
+                transcription=transcription,
+                status=status
+            ))
+
+        return organised
+
+    def organise_and_filter(self, memo_files: List[VoiceMemoFile],
+                          folder_filter: str = None,
+                          status_filter: str = None) -> List[OrganisedMemo]:
+        """
+        Organise memos and filter by folder or status.
+
+        Args:
+            memo_files: List of VoiceMemoFile objects
+            folder_filter: Only include memos from this folder
+            status_filter: Only include memos with this status ('success', 'failed', 'skipped')
+
+        Returns:
+            Filtered list of OrganisedMemo objects
+        """
+        organised = self.organise_memos(memo_files)
+
+        filtered = organised
+
+        if folder_filter:
+            filtered = [memo for memo in filtered if memo.folder == folder_filter]
+
+        if status_filter:
+            filtered = [memo for memo in filtered if memo.status == status_filter]
+
+        return filtered
+
+    def get_transcription_summary(self, organised_memos: List[OrganisedMemo]) -> Dict[str, int]:
+        """Get summary statistics for transcriptions."""
+        summary = {
+            'total': len(organised_memos),
+            'success': 0,
+            'failed': 0,
+            'skipped': 0,
+            'total_chars': 0
+        }
+
+        for memo in organised_memos:
+            summary[memo.status] += 1
+            if memo.status == 'success':
+                summary['total_chars'] += len(memo.transcription)
+
+        return summary
+
+    def save_transcriptions_to_dict(self, organised_memos: List[OrganisedMemo]) -> Dict[str, Dict]:
+        """Convert organised memos to dictionary format for JSON export."""
+        return {
+            memo.uuid: {
+                'title': memo.plain_title,
+                'folder': memo.folder,
+                'file_path': memo.file_path,
+                'transcription': memo.transcription,
+                'status': memo.status,
+                'char_count': len(memo.transcription)
+            }
+            for memo in organised_memos
+        }

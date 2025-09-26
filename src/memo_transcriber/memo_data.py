@@ -12,6 +12,7 @@ class VoiceMemoFile:
     plain_title: str
     f_path: str
     memo_folder: str
+    duration_seconds: float
 
     def __str__(self) -> str:
         return (f"File: name='{self.plain_title}', "
@@ -53,7 +54,8 @@ def get_memo_data(db_path: str) -> List[VoiceMemoFile]:
             uuid=record['recording_id'] or '',
             plain_title=record['plain_title'] or 'Untitled',
             f_path=record['file_path'] or '',
-            memo_folder=record['folder_name'] or 'Unassigned'
+            memo_folder=record['folder_name'] or 'Unassigned',
+            duration_seconds=record['duration_seconds'] or 0.0
         )
         memo_files.append(memo)
 
