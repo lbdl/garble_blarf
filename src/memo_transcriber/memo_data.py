@@ -7,7 +7,16 @@ from dataclasses import dataclass
 
 @dataclass
 class VoiceMemoFile:
-    """Represents a Voice Memo file with its metadata."""
+    """Represents a Voice Memo file with its metadata.
+
+    Attributes:
+        uuid: Unique identifier for the voice memo recording
+        plain_title: Human-readable title/name of the memo
+        f_path: Relative file path to the audio file (e.g., "folder/recording.m4a")
+        memo_folder: Name of the folder containing this memo
+        duration_seconds: Length of the recording in seconds
+        recording_date: Date when the recording was created (formatted string)
+    """
     uuid: str
     plain_title: str
     f_path: str
@@ -24,7 +33,15 @@ class VoiceMemoFile:
 
 @dataclass
 class VoiceMemoFolder:
-    """Represents a Voice Memos folder with its metadata."""
+    """Represents a Voice Memos folder with its metadata.
+
+    Attributes:
+        pk: Primary key/database ID of the folder
+        plain_name: Human-readable name of the folder
+        uuid: Unique identifier for the folder
+        rank: Display order/position of the folder (lower = higher priority)
+        recording_count: Number of recordings contained in this folder
+    """
     pk: int
     plain_name: str
     uuid: str
@@ -37,7 +54,12 @@ class VoiceMemoFolder:
 
 @dataclass
 class UnassignedRecordings:
-    """Represents recordings not assigned to any folder."""
+    """Represents recordings not assigned to any folder.
+
+    Attributes:
+        count: Number of recordings in this unassigned state
+        folder_id: The folder ID value indicating unassigned state (None, 0, or negative)
+    """
     count: int
     folder_id: Optional[int]  # Could be None, 0, or other values
     
@@ -57,7 +79,7 @@ def get_memo_data(db_path: str) -> List[VoiceMemoFile]:
             f_path=record['file_path'] or '',
             memo_folder=record['folder_name'] or 'Unassigned',
             duration_seconds=record['duration_seconds'] or 0.0,
-            recording_date=record['recording_date'] or 0.0
+            recording_date=record['recording_date']
         )
         memo_files.append(memo)
 

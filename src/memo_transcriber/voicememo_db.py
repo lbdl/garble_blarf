@@ -76,7 +76,7 @@ def get_memos_with_folders(db_path: str):
     query = """
     SELECT 
         r.ZUNIQUEID as recording_id,
-        r.ZCUSTOMLABEL as recording_title,
+        r.ZCUSTOMLABEL as recording_date,
         r.ZENCRYPTEDTITLE as plain_title, 
         r.ZPATH as file_path,
         r.ZDURATION as duration_seconds,
@@ -105,6 +105,7 @@ def get_memos_with_folders(db_path: str):
             'file_path': row['file_path'],
             'duration_seconds': row['duration_seconds'],
             'date_timestamp': row['date_timestamp'],
+            'recording_date': row['recording_date'],
             'folder_id': row['folder_id'],
             'folder_name': row['folder_name'] or 'Unassigned',
             'folder_uuid': row['folder_uuid']

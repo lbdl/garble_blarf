@@ -6,7 +6,7 @@ cli implementaion for package:
 import sys
 import click
 from .voice_memos_printer import VoiceMemosPrinter
-from .voicememo_db import cli_get_db_path, cli_get_rec_path
+from .voicememo_db import cli_get_db_path, cli_get_rec_path, get_schema
 from .memo_data import get_memo_data
 from .memo_organiser import MemoOrganiser
 from pathlib import Path
@@ -25,6 +25,10 @@ def main():
     pass
 
 @main.command
+def db_schema():
+    get_schema()
+
+@main.command
 def example():
     db_path = _get_db()
     VoiceMemosPrinter.example_usage_patterns(db_path)
@@ -36,7 +40,7 @@ def filetree():
     VoiceMemosPrinter.print_memo_files(records)
 
 @main.command
-def transcribe_file():
+def test_transcribe():
     fp_base = cli_get_rec_path()
     testfile = "20180114 132606-76050490.m4a"
     testfile2 = "20170421 092405-852A1FFE.m4a"

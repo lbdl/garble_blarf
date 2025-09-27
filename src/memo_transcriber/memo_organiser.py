@@ -19,7 +19,17 @@ except ImportError:
 
 @dataclass
 class OrganisedMemo:
-    """Structured memo data with transcription."""
+    """Structured memo data with transcription.
+
+    Attributes:
+        file_path: Full path to the audio file on disk
+        plain_title: Human-readable title/name of the memo
+        folder: Name of the folder containing this memo
+        uuid: Unique identifier for the recording
+        transcription: Transcribed text content or error message
+        status: Processing status ('success', 'failed', 'skipped')
+        date: Recording date as formatted string
+    """
     file_path: str
     plain_title: str
     folder: str
@@ -40,7 +50,7 @@ class MemoOrganiser:
     def __init__(self, recordings_base_path: str = '', output: str = 'Documents/transcripions'):
         """Initialize with optional custom recordings path and output folder"""
         self.recordings_base = Path(recordings_base_path) if recordings_base_path else cli_get_rec_path()
-        self.recordings_base = output
+        self.recordings_base = Path(output)
 
     def organise_memos(self, memo_files: List[VoiceMemoFile],
                       transcribe: bool = True,
