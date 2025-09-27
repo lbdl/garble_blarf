@@ -1,0 +1,3 @@
+# This file indicates development mode
+# When present, development commands are available
+# This file is excluded from production builds

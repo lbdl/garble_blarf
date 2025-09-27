@@ -20,6 +20,22 @@ dev = [
 [project.scripts]
 memo-transcriber = "memo_transcriber.cli:main"
 
-# Hatchling configuration (optional)
+# Hatchling configuration
 [tool.hatch.build.targets.wheel]
 packages = ["src/memo_transcriber"]
+# Exclude development files from production builds
+exclude = [
+    "src/memo_transcriber/dev_*.py",
+    "test_*.db",
+    "*.db-journal",
+    ".dev"
+]
+
+[tool.hatch.build.targets.sdist]
+# Also exclude from source distribution
+exclude = [
+    "src/memo_transcriber/dev_*.py",
+    "test_*.db",
+    "*.db-journal",
+    ".dev"
+]

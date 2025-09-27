@@ -9,17 +9,22 @@ from .voice_memos_printer import VoiceMemosPrinter
 from .voicememo_db import cli_get_db_path, cli_get_rec_path, get_schema
 from .memo_data import get_memo_data
 from .memo_organiser import MemoOrganiser
-from .database import MemoDatabase
+from .database import MemoDatabase, get_user_data_dir
 from pathlib import Path
 from .transcriber import transcribe_file as transcribe_audio
 
 def _get_db():
+    """Get Voice Memos database path."""
     db_path = cli_get_db_path()
     if not db_path[0]:
         print(f"{db_path[1]}")
         sys.exit(1)
     else:
         return str(db_path[1])
+
+def _get_default_transcription_db():
+    """Get default transcription database path."""
+    return str(get_user_data_dir() / "memo_transcriptions.db")
 
 @click.group
 def main():
@@ -51,56 +56,18 @@ def test_transcribe():
     print(f"{res}")
 
 @main.command()
-@click.option('--limit', default=2, help='Number of files to test with')
-@click.option('--max-duration', default=1.0, help='Skip files longer than this many minutes')
-def test_db(limit, max_duration):
-    """Test database integration with a small batch of files."""
-    db_path = _get_db()
-    memo_files = get_memo_data(db_path)
-
-    print(f"Testing database integration with {limit} files (max {max_duration} min duration)")
-
-    # Take just a few files for testing
-    test_files = memo_files[:limit]
-
-    if not test_files:
-        print("No files found to test with")
-        return
-
-    print(f"Selected files:")
-    for i, memo in enumerate(test_files, 1):
-        duration_min = memo.duration_seconds / 60.0
-        print(f"  {i}. {memo.plain_title} ({duration_min:.1f} min)")
-
-    # Use a test database file
-    organiser = MemoOrganiser(db_path='test_memo_transcriptions.db')
-
-    print("\nProcessing files...")
-    results = organiser.organise_memos(test_files, transcribe=True, max_duration_minutes=max_duration)
-
-    # Show results
-    print(f"\nResults:")
-    for result in results:
-        print(f"  {result.status}: {result.plain_title}")
-        if result.status == 'success':
-            print(f"    Transcript: {result.transcription[:100]}...")
-
-    # Show database stats
-    stats = organiser.db.get_processing_stats()
-    print(f"\nDatabase stats: {stats}")
-
-    print(f"\nTest complete! Run 'memo-transcriber test-db --limit {limit}' again to see caching in action.")
-
-@main.command()
-@click.option('--db-path', default='memo_transcriptions.db', help='Path to transcription database')
+@click.option('--db-path', default=None, help='Path to transcription database')
 def db_stats(db_path):
     """Show database statistics and processing history."""
+    if db_path is None:
+        db_path = _get_default_transcription_db()
+
     try:
         db = MemoDatabase(db_path)
         stats = db.get_processing_stats()
 
-        print(f"Database: {db_path}")
-        print("=" * 50)
+        print(f"📊 Database: {db_path}")
+        print("=" * 70)
 
         # Transcription statistics
         if 'transcriptions' in stats and stats['transcriptions']:
@@ -135,11 +102,14 @@ def db_stats(db_path):
         print(f"Error reading database: {e}")
 
 @main.command()
-@click.option('--db-path', default='memo_transcriptions.db', help='Path to transcription database')
+@click.option('--db-path', default=None, help='Path to transcription database')
 @click.option('--status', help='Filter by status (success, failed, skipped)')
 @click.option('--limit', default=10, help='Maximum number of records to show')
 def list_cached(db_path, status, limit):
     """List cached transcriptions from database."""
+    if db_path is None:
+        db_path = _get_default_transcription_db()
+
     try:
         db = MemoDatabase(db_path)
         records = db.get_all_transcriptions(status_filter=status)
@@ -186,12 +156,19 @@ def list_cached(db_path, status, limit):
 @click.option('--transcribe/--no-transcribe', default=True, help='Whether to transcribe audio files')
 @click.option('--folder', help='Filter by specific folder')
 @click.option('--max-duration', default=8.0, help='Skip files longer than this many minutes')
-def organise(transcribe, folder, max_duration):
+@click.option('--db-path', default=None, help='Path to transcription database')
+def organise(transcribe, folder, max_duration, db_path):
     """Organise voice memos with transcriptions."""
-    db_path = _get_db()
-    memo_files = get_memo_data(db_path)
+    voice_memos_db = _get_db()
+    memo_files = get_memo_data(voice_memos_db)
 
-    organiser = MemoOrganiser()
+    if db_path is None:
+        db_path = _get_default_transcription_db()
+
+    print(f"📁 Voice Memos DB: {voice_memos_db}")
+    print(f"💾 Transcription DB: {db_path}")
+
+    organiser = MemoOrganiser(db_path=db_path)
     organised = organiser.organise_memos(memo_files, transcribe=transcribe, max_duration_minutes=max_duration)
 
     # Filter by folder if specified
@@ -243,4 +220,14 @@ def check_duration():
         print("-" * 30)
 
     conn.close()
+
+
+# Load development commands if in dev mode
+import os
+if os.getenv('MEMO_DEV_MODE') or os.path.exists('.dev') or os.path.exists('pyproject.toml'):
+    try:
+        from .dev_commands import register_dev_commands
+        register_dev_commands(main)
+    except ImportError:
+        pass  # Dev commands not available in production build
 

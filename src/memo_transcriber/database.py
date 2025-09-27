@@ -5,11 +5,19 @@ Database management for memo transcriber - handles transcription cache, processi
 import sqlite3
 import hashlib
 import time
+import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import json
+
+
+def get_user_data_dir() -> Path:
+    """Get the user data directory for memo transcriber."""
+    data_dir = Path.home() / '.local' / 'share' / 'memo-transcriber'
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 @dataclass
@@ -107,9 +115,14 @@ class ProcessingBatch:
 class MemoDatabase:
     """Manages SQLite database for memo transcription data."""
 
-    def __init__(self, db_path: str = "memo_transcriptions.db"):
+    def __init__(self, db_path: Optional[str] = None):
         """Initialize database connection and create tables if needed."""
-        self.db_path = Path(db_path)
+        if db_path is None:
+            # Use user data directory by default
+            self.db_path = get_user_data_dir() / "memo_transcriptions.db"
+        else:
+            # Allow custom path (for testing, etc.)
+            self.db_path = Path(db_path)
         self.init_database()
 
     def init_database(self) -> None:
