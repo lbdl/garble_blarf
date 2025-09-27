@@ -3,6 +3,7 @@ Development and testing commands for memo transcriber.
 This module is excluded from production builds.
 """
 
+from typing import Optional
 import click
 from .voicememo_db import cli_get_db_path
 from .memo_data import get_memo_data
@@ -10,7 +11,7 @@ from .memo_organiser import MemoOrganiser
 from .database import MemoDatabase, get_user_data_dir
 
 
-def _get_db():
+def _get_db() -> str:
     """Helper to get database path (duplicated from cli.py for dev isolation)."""
     db_path = cli_get_db_path()
     if not db_path[0]:
@@ -21,13 +22,13 @@ def _get_db():
         return str(db_path[1])
 
 
-def register_dev_commands(main_group):
+def register_dev_commands(main_group: click.Group) -> None:
     """Register development commands with the main CLI group."""
 
     @main_group.command()
     @click.option('--limit', default=2, help='Number of files to test with')
     @click.option('--max-duration', default=1.0, help='Skip files longer than this many minutes')
-    def test_db(limit, max_duration):
+    def test_db(limit: int, max_duration: float) -> None:
         """[DEV] Test database integration with a small batch of files."""
         db_path = _get_db()
         memo_files = get_memo_data(db_path)
@@ -72,7 +73,7 @@ def register_dev_commands(main_group):
 
     @main_group.command()
     @click.option('--db-path', default=None, help='Path to test database')
-    def dev_db_stats(db_path):
+    def dev_db_stats(db_path: Optional[str]) -> None:
         """[DEV] Show test database statistics."""
         if db_path is None:
             db_path = get_user_data_dir() / 'test_memo_transcriptions.db'
@@ -108,7 +109,7 @@ def register_dev_commands(main_group):
             print(f"Error reading test database: {e}")
 
     @main_group.command()
-    def dev_clean():
+    def dev_clean() -> None:
         """[DEV] Clean up test databases and temporary files."""
         import os
         import glob

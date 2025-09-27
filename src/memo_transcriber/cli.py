@@ -4,6 +4,7 @@ cli implementaion for package:
         get_db_path() via example()
 """
 import sys
+from typing import Optional
 import click
 from .voice_memos_printer import VoiceMemosPrinter
 from .voicememo_db import cli_get_db_path, cli_get_rec_path, get_schema
@@ -26,27 +27,27 @@ def _get_default_transcription_db():
     """Get default transcription database path."""
     return str(get_user_data_dir() / "memo_transcriptions.db")
 
-@click.group
-def main():
+@click.group()
+def main() -> None:
     pass
 
-@main.command
-def db_schema():
+@main.command()
+def db_schema() -> None:
     get_schema()
 
-@main.command
-def example():
+@main.command()
+def example() -> None:
     db_path = _get_db()
     VoiceMemosPrinter.example_usage_patterns(db_path)
 
-@main.command
-def filetree():
+@main.command()
+def filetree() -> None:
     db_path = _get_db()
     records = get_memo_data(db_path)
     VoiceMemosPrinter.print_memo_files(records)
 
-@main.command
-def test_transcribe():
+@main.command()
+def test_transcribe() -> None:
     fp_base = cli_get_rec_path()
     testfile = "20180114 132606-76050490.m4a"
     testfile2 = "20170421 092405-852A1FFE.m4a"
@@ -57,7 +58,7 @@ def test_transcribe():
 
 @main.command()
 @click.option('--db-path', default=None, help='Path to transcription database')
-def db_stats(db_path):
+def db_stats(db_path: Optional[str]) -> None:
     """Show database statistics and processing history."""
     if db_path is None:
         db_path = _get_default_transcription_db()
@@ -105,7 +106,7 @@ def db_stats(db_path):
 @click.option('--db-path', default=None, help='Path to transcription database')
 @click.option('--status', help='Filter by status (success, failed, skipped)')
 @click.option('--limit', default=10, help='Maximum number of records to show')
-def list_cached(db_path, status, limit):
+def list_cached(db_path: Optional[str], status: Optional[str], limit: int) -> None:
     """List cached transcriptions from database."""
     if db_path is None:
         db_path = _get_default_transcription_db()
@@ -157,7 +158,7 @@ def list_cached(db_path, status, limit):
 @click.option('--folder', help='Filter by specific folder')
 @click.option('--max-duration', default=8.0, help='Skip files longer than this many minutes')
 @click.option('--db-path', default=None, help='Path to transcription database')
-def organise(transcribe, folder, max_duration, db_path):
+def organise(transcribe: bool, folder: Optional[str], max_duration: float, db_path: Optional[str]) -> None:
     """Organise voice memos with transcriptions."""
     voice_memos_db = _get_db()
     memo_files = get_memo_data(voice_memos_db)
@@ -191,7 +192,7 @@ def organise(transcribe, folder, max_duration, db_path):
     print(f"Summary: {summary['success']} success, {summary['failed']} failed, {summary['skipped']} skipped")
 
 @main.command()
-def check_duration():
+def check_duration() -> None:
     """Check ZDURATION values to understand the units."""
     db_path = _get_db()
     import sqlite3

@@ -12,8 +12,9 @@ dependencies = ["click","tqdm", "openai-whisper", "pyobjc-framework-Speech", "py
 [project.optional-dependencies]
 dev = [
     "black>=22.0.0",
-    "ruff>=0.1.0", 
+    "ruff>=0.1.0",
     "pytest>=7.0.0",
+    "types-click>=7.1.0",
 ]
 
 # Define console commands

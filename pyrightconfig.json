@@ -6,7 +6,12 @@
     "**/node_modules",
     "**/__pycache__"
   ],
-  "reportMissingImports": true,
+  "reportMissingImports": "warning",
   "reportMissingTypeStubs": false,
-  "pythonVersion": "3.13"
+  "pythonVersion": "3.13",
+  "pythonPath": "/Users/tims/.pyenv/versions/voice_transcription/bin/python",
+  "reportMissingModuleSource": false,
+  "extraPaths": [
+    "/Users/tims/.pyenv/versions/voice_transcription/lib/python3.13/site-packages"
+  ]
 }
