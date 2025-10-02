@@ -20,6 +20,7 @@ dev = [
 # Define console commands
 [project.scripts]
 memo-transcriber = "memo_transcriber.cli:main"
+comparator = "memo_transcriber.comparator:main"
 
 # Hatchling configuration
 [tool.hatch.build.targets.wheel]

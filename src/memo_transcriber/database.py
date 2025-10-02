@@ -39,6 +39,7 @@ class TranscriptionRecord:
         file_hash: Hash of audio file for change detection
         model_used: Which transcription model/method was used
         processing_time_seconds: How long transcription took
+        is_reference: Whether this is a reference (ground truth) transcription
     """
     uuid: str
     plain_title: str
@@ -54,6 +55,7 @@ class TranscriptionRecord:
     file_hash: Optional[str] = None
     model_used: Optional[str] = None
     processing_time_seconds: Optional[float] = None
+    is_reference: int = 0
 
 
 @dataclass
@@ -113,13 +115,51 @@ class ProcessingBatch:
 
 
 @dataclass
+class ModelTranscriptionRecord:
+    """Database record for model-specific transcription.
+
+    Attributes:
+        memo_uuid: UUID of the original voice memo
+        model_used: Which model was used (apple, whisper-base, etc.)
+        transcription: Transcribed text content
+        status: Processing status ('success', 'failed', 'skipped')
+        id: Auto-increment ID
+        error_message: Error details if processing failed
+        processing_time_seconds: How long transcription took
+        processed_at: When transcription was completed
+        file_hash: Hash of audio file for change detection
+        is_reference: Whether this is a reference (ground truth) transcription
+        plain_title: Title of the memo (denormalized)
+        folder_name: Folder name (denormalized)
+        file_path: Path to audio file (denormalized)
+        duration_seconds: Audio duration (denormalized)
+        recording_date: Recording date (denormalized)
+    """
+    memo_uuid: str
+    model_used: str
+    transcription: str
+    status: str
+    id: Optional[int] = None
+    error_message: Optional[str] = None
+    processing_time_seconds: Optional[float] = None
+    processed_at: Optional[str] = None
+    file_hash: Optional[str] = None
+    is_reference: int = 0
+    plain_title: Optional[str] = None
+    folder_name: Optional[str] = None
+    file_path: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    recording_date: Optional[str] = None
+
+
+@dataclass
 class ComparisonRecord:
     """Database record for transcription comparison results.
 
     Attributes:
         id: Auto-increment ID
-        reference_uuid: UUID of the reference (ground truth) transcription
-        hypothesis_uuid: UUID of the hypothesis (test) transcription
+        reference_id: ID of the reference (ground truth) model transcription
+        hypothesis_id: ID of the hypothesis (test) model transcription
         wer: Word Error Rate (0.0 to 1.0+)
         cer: Character Error Rate (0.0 to 1.0+)
         substitutions: Number of word substitutions
@@ -135,8 +175,8 @@ class ComparisonRecord:
         compared_at: When comparison was performed
         notes: Optional notes about the comparison
     """
-    reference_uuid: str
-    hypothesis_uuid: str
+    reference_id: int
+    hypothesis_id: int
     wer: float
     cer: float
     substitutions: int
@@ -216,10 +256,29 @@ class MemoDatabase:
                     avg_processing_time REAL
                 );
 
+                CREATE TABLE IF NOT EXISTS model_transcriptions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    memo_uuid TEXT NOT NULL,
+                    model_used TEXT NOT NULL,
+                    transcription TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error_message TEXT,
+                    processing_time_seconds REAL,
+                    processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    file_hash TEXT,
+                    is_reference INTEGER DEFAULT 0,
+                    plain_title TEXT,
+                    folder_name TEXT,
+                    file_path TEXT,
+                    duration_seconds REAL,
+                    recording_date TEXT,
+                    UNIQUE(memo_uuid, model_used)
+                );
+
                 CREATE TABLE IF NOT EXISTS transcription_comparisons (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    reference_uuid TEXT NOT NULL,
-                    hypothesis_uuid TEXT NOT NULL,
+                    reference_id INTEGER NOT NULL,
+                    hypothesis_id INTEGER NOT NULL,
                     wer REAL NOT NULL,
                     cer REAL NOT NULL,
                     substitutions INTEGER NOT NULL,
@@ -234,8 +293,8 @@ class MemoDatabase:
                     cosine_similarity REAL NOT NULL,
                     compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     notes TEXT,
-                    FOREIGN KEY (reference_uuid) REFERENCES transcriptions(uuid),
-                    FOREIGN KEY (hypothesis_uuid) REFERENCES transcriptions(uuid)
+                    FOREIGN KEY (reference_id) REFERENCES model_transcriptions(id),
+                    FOREIGN KEY (hypothesis_id) REFERENCES model_transcriptions(id)
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);
@@ -243,8 +302,11 @@ class MemoDatabase:
                 CREATE INDEX IF NOT EXISTS idx_transcriptions_reference ON transcriptions(is_reference);
                 CREATE INDEX IF NOT EXISTS idx_file_exports_uuid ON file_exports(uuid);
                 CREATE INDEX IF NOT EXISTS idx_file_exports_status ON file_exports(export_status);
-                CREATE INDEX IF NOT EXISTS idx_comparisons_reference ON transcription_comparisons(reference_uuid);
-                CREATE INDEX IF NOT EXISTS idx_comparisons_hypothesis ON transcription_comparisons(hypothesis_uuid);
+                CREATE INDEX IF NOT EXISTS idx_model_trans_memo ON model_transcriptions(memo_uuid);
+                CREATE INDEX IF NOT EXISTS idx_model_trans_model ON model_transcriptions(model_used);
+                CREATE INDEX IF NOT EXISTS idx_model_trans_reference ON model_transcriptions(is_reference);
+                CREATE INDEX IF NOT EXISTS idx_comparisons_reference ON transcription_comparisons(reference_id);
+                CREATE INDEX IF NOT EXISTS idx_comparisons_hypothesis ON transcription_comparisons(hypothesis_id);
             """)
 
     def get_file_hash(self, file_path: str) -> Optional[str]:
@@ -502,4 +564,169 @@ class MemoDatabase:
             """, (reference_uuid,))
 
             return [dict(row) for row in cursor.fetchall()]
+
+    # Model Transcription Methods
+
+    def save_model_transcription(self, record: ModelTranscriptionRecord) -> int:
+        """Save or update a model transcription record."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO model_transcriptions (
+                    memo_uuid, model_used, transcription, status, error_message,
+                    processing_time_seconds, file_hash, is_reference,
+                    plain_title, folder_name, file_path, duration_seconds, recording_date
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record.memo_uuid, record.model_used, record.transcription,
+                record.status, record.error_message, record.processing_time_seconds,
+                record.file_hash, record.is_reference, record.plain_title,
+                record.folder_name, record.file_path, record.duration_seconds,
+                record.recording_date
+            ))
+            return cursor.lastrowid
+
+    def get_model_transcription(self, transcription_id: int) -> Optional[ModelTranscriptionRecord]:
+        """Get a model transcription by ID."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM model_transcriptions WHERE id = ?", (transcription_id,))
+            row = cursor.fetchone()
+            if row:
+                return ModelTranscriptionRecord(**dict(row))
+            return None
+
+    def get_model_transcriptions_for_memo(self, memo_uuid: str) -> List[ModelTranscriptionRecord]:
+        """Get all model transcriptions for a specific memo."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM model_transcriptions
+                WHERE memo_uuid = ?
+                ORDER BY processed_at DESC
+            """, (memo_uuid,))
+            return [ModelTranscriptionRecord(**dict(row)) for row in cursor.fetchall()]
+
+    def get_model_transcription_by_model(self, memo_uuid: str, model: str) -> Optional[ModelTranscriptionRecord]:
+        """Get a specific model's transcription for a memo."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM model_transcriptions
+                WHERE memo_uuid = ? AND model_used = ?
+            """, (memo_uuid, model))
+            row = cursor.fetchone()
+            if row:
+                return ModelTranscriptionRecord(**dict(row))
+            return None
+
+    def mark_model_transcription_as_reference(self, transcription_id: int) -> None:
+        """Mark a model transcription as reference (ground truth)."""
+        with sqlite3.connect(self.db_path) as conn:
+            # First, unmark any existing reference for this memo
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT memo_uuid FROM model_transcriptions WHERE id = ?
+            """, (transcription_id,))
+            row = cursor.fetchone()
+            if row:
+                memo_uuid = row[0]
+                # Unmark all references for this memo
+                conn.execute("""
+                    UPDATE model_transcriptions
+                    SET is_reference = 0
+                    WHERE memo_uuid = ?
+                """, (memo_uuid,))
+                # Mark the new reference
+                conn.execute("""
+                    UPDATE model_transcriptions
+                    SET is_reference = 1
+                    WHERE id = ?
+                """, (transcription_id,))
+
+    def get_reference_for_memo(self, memo_uuid: str) -> Optional[ModelTranscriptionRecord]:
+        """Get the reference transcription for a memo."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM model_transcriptions
+                WHERE memo_uuid = ? AND is_reference = 1
+            """, (memo_uuid,))
+            row = cursor.fetchone()
+            if row:
+                return ModelTranscriptionRecord(**dict(row))
+            return None
+
+    def save_model_comparison(self, comparison: ComparisonRecord) -> int:
+        """Save a model transcription comparison result."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO transcription_comparisons (
+                    reference_id, hypothesis_id, wer, cer,
+                    substitutions, deletions, insertions, total_edits,
+                    word_count_ref, word_count_hyp, word_count_diff,
+                    word_count_diff_pct, jaccard_similarity, cosine_similarity,
+                    notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                comparison.reference_id, comparison.hypothesis_id,
+                comparison.wer, comparison.cer,
+                comparison.substitutions, comparison.deletions,
+                comparison.insertions, comparison.total_edits,
+                comparison.word_count_ref, comparison.word_count_hyp,
+                comparison.word_count_diff, comparison.word_count_diff_pct,
+                comparison.jaccard_similarity, comparison.cosine_similarity,
+                comparison.notes
+            ))
+            return cursor.lastrowid
+
+    def get_comparisons_for_memo(self, memo_uuid: str) -> List[Tuple[ComparisonRecord, ModelTranscriptionRecord, ModelTranscriptionRecord]]:
+        """Get all comparisons for a memo with full transcription details."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT
+                    c.*,
+                    ref.model_used as ref_model,
+                    ref.transcription as ref_transcription,
+                    hyp.model_used as hyp_model,
+                    hyp.transcription as hyp_transcription
+                FROM transcription_comparisons c
+                JOIN model_transcriptions ref ON c.reference_id = ref.id
+                JOIN model_transcriptions hyp ON c.hypothesis_id = hyp.id
+                WHERE ref.memo_uuid = ?
+                ORDER BY c.compared_at DESC
+            """, (memo_uuid,))
+
+            results = []
+            for row in cursor.fetchall():
+                row_dict = dict(row)
+                comparison = ComparisonRecord(
+                    id=row_dict['id'],
+                    reference_id=row_dict['reference_id'],
+                    hypothesis_id=row_dict['hypothesis_id'],
+                    wer=row_dict['wer'],
+                    cer=row_dict['cer'],
+                    substitutions=row_dict['substitutions'],
+                    deletions=row_dict['deletions'],
+                    insertions=row_dict['insertions'],
+                    total_edits=row_dict['total_edits'],
+                    word_count_ref=row_dict['word_count_ref'],
+                    word_count_hyp=row_dict['word_count_hyp'],
+                    word_count_diff=row_dict['word_count_diff'],
+                    word_count_diff_pct=row_dict['word_count_diff_pct'],
+                    jaccard_similarity=row_dict['jaccard_similarity'],
+                    cosine_similarity=row_dict['cosine_similarity'],
+                    compared_at=row_dict['compared_at'],
+                    notes=row_dict['notes']
+                )
+                results.append((comparison, row_dict['ref_model'], row_dict['hyp_model']))
+
+            return results
 
