@@ -2,17 +2,20 @@
 Memo Organiser - Processes voice memo files and creates structured transcription data.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
 import time
 import uuid
 import re
+import hashlib
+import json
+import os
 from datetime import datetime
 from .memo_data import VoiceMemoFile
 from .transcriber import transcribe_file
 from .voicememo_db import cli_get_rec_path
-from .database import MemoDatabase, TranscriptionRecord
+from .database import MemoDatabase, TranscriptionRecord, ExportRecord
 
 try:
     from tqdm import tqdm
@@ -407,3 +410,261 @@ class MemoOrganiser:
             }
             for memo in organised_memos
         }
+
+    def _get_content_hash(self, content: str) -> str:
+        """Calculate SHA-256 hash of string content."""
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+    def _get_file_hash(self, file_path: Path) -> Optional[str]:
+        """Calculate SHA-256 hash of file content."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            return self._get_content_hash(content)
+        except (FileNotFoundError, PermissionError, UnicodeDecodeError):
+            return None
+
+    def _should_export_file(self, file_path: Path, db_content: str, db_timestamp: str, force: bool) -> Tuple[bool, str]:
+        """
+        Determine if file should be exported based on existence, hash, and timestamp.
+
+        Returns:
+            Tuple of (should_export: bool, reason: str)
+        """
+        if force:
+            return True, "forced overwrite"
+
+        if not file_path.exists():
+            return True, "new file"
+
+        # Compare content hashes
+        file_hash = self._get_file_hash(file_path)
+        db_hash = self._get_content_hash(db_content)
+
+        if file_hash != db_hash:
+            return True, "content changed"
+
+        # Compare timestamps (file mtime vs DB processed_at)
+        try:
+            file_mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+            db_time = datetime.fromisoformat(db_timestamp) if db_timestamp else None
+
+            if db_time and file_mtime < db_time:
+                return True, "database newer"
+        except (OSError, ValueError):
+            pass
+
+        return False, "unchanged"
+
+    def _format_markdown(self, record: TranscriptionRecord) -> str:
+        """Format transcription as Markdown with metadata header."""
+        duration_min = (record.duration_seconds or 0) / 60.0
+
+        content = f"# {record.plain_title}\n\n"
+        content += f"**Folder:** {record.folder_name}"
+
+        if record.recording_date:
+            content += f" | **Date:** {record.recording_date}"
+
+        if record.duration_seconds:
+            content += f" | **Duration:** {duration_min:.1f} min"
+
+        content += "\n\n---\n\n"
+        content += record.transcription
+
+        return content
+
+    def _format_text(self, record: TranscriptionRecord) -> str:
+        """Format transcription as plain text (transcription only)."""
+        return record.transcription
+
+    def _format_json(self, record: TranscriptionRecord) -> str:
+        """Format transcription as JSON with all metadata."""
+        data = {
+            'uuid': record.uuid,
+            'title': record.plain_title,
+            'folder': record.folder_name,
+            'file_path': record.file_path,
+            'transcription': record.transcription,
+            'status': record.status,
+            'duration_seconds': record.duration_seconds,
+            'recording_date': record.recording_date,
+            'processed_at': record.processed_at,
+            'model_used': record.model_used,
+            'processing_time_seconds': record.processing_time_seconds
+        }
+        return json.dumps(data, indent=2, ensure_ascii=False)
+
+    def export_transcriptions(self,
+                             format: str = 'md',
+                             only_unexported: bool = True,
+                             force: bool = False,
+                             status_filter: str = 'success') -> Dict[str, int]:
+        """
+        Export transcriptions to files on disk.
+
+        Args:
+            format: Export format ('md', 'txt', 'json')
+            only_unexported: Only export transcriptions not yet exported
+            force: Overwrite existing files even if unchanged
+            status_filter: Which transcriptions to export (default: 'success')
+
+        Returns:
+            Dictionary with export statistics
+        """
+        # Get transcriptions to export
+        if only_unexported:
+            records = self.db.get_unexported_transcriptions()
+        else:
+            records = self.db.get_all_transcriptions(status_filter=status_filter)
+
+        if not records:
+            return {
+                'total': 0,
+                'exported': 0,
+                'skipped': 0,
+                'failed': 0
+            }
+
+        # Format file extension mapping
+        format_map = {
+            'md': '.md',
+            'txt': '.txt',
+            'json': '.json'
+        }
+        file_ext = format_map.get(format, '.txt')
+
+        # Format content functions
+        format_funcs = {
+            'md': self._format_markdown,
+            'txt': self._format_text,
+            'json': self._format_json
+        }
+        format_func = format_funcs.get(format, self._format_text)
+
+        stats = {
+            'total': len(records),
+            'exported': 0,
+            'skipped': 0,
+            'failed': 0
+        }
+
+        # Progress tracking
+        if HAS_TQDM:
+            progress_bar = tqdm(total=len(records), desc="Exporting", unit="file")
+        else:
+            progress_bar = None
+            print(f"Exporting {len(records)} transcriptions...")
+
+        for record in records:
+            # Build output path with correct extension
+            output_path_base = Path(record.output_file_path).with_suffix('')
+            output_file_path = output_path_base.with_suffix(file_ext)
+            full_output_path = self.output_base / output_file_path
+
+            # Format content
+            try:
+                content = format_func(record)
+            except Exception as e:
+                if progress_bar:
+                    progress_bar.write(f"Failed to format {record.plain_title}: {e}")
+                else:
+                    print(f"Failed to format {record.plain_title}: {e}")
+
+                # Record failed export
+                self.db.record_export(ExportRecord(
+                    uuid=record.uuid,
+                    output_file_path=str(full_output_path),
+                    export_status='failed',
+                    error_message=f"Format error: {str(e)}",
+                    export_format=format
+                ))
+                stats['failed'] += 1
+                if progress_bar:
+                    progress_bar.update(1)
+                continue
+
+            # Check if we should export
+            should_export, reason = self._should_export_file(
+                full_output_path,
+                content,
+                record.processed_at or '',
+                force
+            )
+
+            if not should_export:
+                if progress_bar:
+                    progress_bar.write(f"Skipped {record.plain_title}: {reason}")
+                stats['skipped'] += 1
+                if progress_bar:
+                    progress_bar.update(1)
+                continue
+
+            # Create directory structure
+            try:
+                full_output_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                if progress_bar:
+                    progress_bar.write(f"Failed to create directory for {record.plain_title}: {e}")
+                else:
+                    print(f"Failed to create directory for {record.plain_title}: {e}")
+
+                self.db.record_export(ExportRecord(
+                    uuid=record.uuid,
+                    output_file_path=str(full_output_path),
+                    export_status='failed',
+                    error_message=f"Directory creation error: {str(e)}",
+                    export_format=format
+                ))
+                stats['failed'] += 1
+                if progress_bar:
+                    progress_bar.update(1)
+                continue
+
+            # Write file
+            try:
+                with open(full_output_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+                # Calculate file size and checksum
+                file_size = os.path.getsize(full_output_path)
+                checksum = self._get_file_hash(full_output_path)
+
+                # Record successful export
+                self.db.record_export(ExportRecord(
+                    uuid=record.uuid,
+                    output_file_path=str(full_output_path),
+                    export_status='success',
+                    file_size_bytes=file_size,
+                    checksum=checksum,
+                    export_format=format
+                ))
+
+                stats['exported'] += 1
+                if progress_bar:
+                    progress_bar.write(f"Exported: {record.plain_title} ({reason})")
+                else:
+                    print(f"Exported: {record.plain_title} ({reason})")
+
+            except (OSError, IOError) as e:
+                if progress_bar:
+                    progress_bar.write(f"Failed to write {record.plain_title}: {e}")
+                else:
+                    print(f"Failed to write {record.plain_title}: {e}")
+
+                self.db.record_export(ExportRecord(
+                    uuid=record.uuid,
+                    output_file_path=str(full_output_path),
+                    export_status='failed',
+                    error_message=f"Write error: {str(e)}",
+                    export_format=format
+                ))
+                stats['failed'] += 1
+
+            if progress_bar:
+                progress_bar.update(1)
+
+        if progress_bar:
+            progress_bar.close()
+
+        return stats

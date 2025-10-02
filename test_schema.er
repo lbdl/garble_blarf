@@ -1,0 +1,50 @@
+# Memo Transcriber Database Schema
+# Generated from memo_transcriber.database
+
+title {label: "Memo Transcriber Database", size: "20"}
+
+# Main transcription data table
+[transcriptions] {bgcolor: "#d0e0d0"}
+  *uuid {label: "varchar, PK"}
+  plain_title {label: "varchar, not null"}
+  folder_name {label: "varchar, not null"}
+  file_path {label: "varchar, not null, source audio file"}
+  output_file_path {label: "varchar, not null, target organized file"}
+  transcription {label: "text, not null"}
+  status {label: "varchar, not null, success|failed|skipped"}
+  error_message {label: "text, nullable"}
+  duration_seconds {label: "real, nullable"}
+  recording_date {label: "varchar, nullable"}
+  processed_at {label: "timestamp, default CURRENT_TIMESTAMP"}
+  file_hash {label: "varchar, nullable, SHA-256 for change detection"}
+  model_used {label: "varchar, nullable, transcription model"}
+  processing_time_seconds {label: "real, nullable"}
+
+# Export tracking table
+[file_exports] {bgcolor: "#e0d0d0"}
+  *id {label: "integer, PK, autoincrement"}
+  +uuid {label: "varchar, FK"}
+  output_file_path {label: "varchar, not null"}
+  exported_at {label: "timestamp, default CURRENT_TIMESTAMP"}
+  file_size_bytes {label: "integer, nullable"}
+  checksum {label: "varchar, nullable, file integrity"}
+  export_status {label: "varchar, not null, success|failed|pending"}
+  error_message {label: "text, nullable"}
+  export_format {label: "varchar, default 'txt'"}
+
+# Processing batch metadata
+[processing_metadata] {bgcolor: "#d0d0e0"}
+  *id {label: "integer, PK, autoincrement"}
+  batch_id {label: "varchar, not null, unique batch identifier"}
+  started_at {label: "timestamp, default CURRENT_TIMESTAMP"}
+  completed_at {label: "timestamp, nullable"}
+  total_files {label: "integer, nullable"}
+  success_count {label: "integer, default 0"}
+  failed_count {label: "integer, default 0"}
+  skipped_count {label: "integer, default 0"}
+  settings_json {label: "text, nullable, processing parameters"}
+  model_used {label: "varchar, nullable"}
+  avg_processing_time {label: "real, nullable"}
+
+# Relationships
+transcriptions 1--* file_exports

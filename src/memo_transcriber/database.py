@@ -339,3 +339,4 @@ class MemoDatabase:
                 'transcriptions': transcription_stats,
                 'exports': export_stats
             }
+
