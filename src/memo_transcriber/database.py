@@ -112,6 +112,48 @@ class ProcessingBatch:
     avg_processing_time: Optional[float] = None
 
 
+@dataclass
+class ComparisonRecord:
+    """Database record for transcription comparison results.
+
+    Attributes:
+        id: Auto-increment ID
+        reference_uuid: UUID of the reference (ground truth) transcription
+        hypothesis_uuid: UUID of the hypothesis (test) transcription
+        wer: Word Error Rate (0.0 to 1.0+)
+        cer: Character Error Rate (0.0 to 1.0+)
+        substitutions: Number of word substitutions
+        deletions: Number of word deletions
+        insertions: Number of word insertions
+        total_edits: Total edit operations needed
+        word_count_ref: Word count in reference
+        word_count_hyp: Word count in hypothesis
+        word_count_diff: Difference in word counts
+        word_count_diff_pct: Percentage difference in word counts
+        jaccard_similarity: Jaccard similarity score (0.0 to 1.0)
+        cosine_similarity: Cosine similarity score (0.0 to 1.0)
+        compared_at: When comparison was performed
+        notes: Optional notes about the comparison
+    """
+    reference_uuid: str
+    hypothesis_uuid: str
+    wer: float
+    cer: float
+    substitutions: int
+    deletions: int
+    insertions: int
+    total_edits: int
+    word_count_ref: int
+    word_count_hyp: int
+    word_count_diff: int
+    word_count_diff_pct: float
+    jaccard_similarity: float
+    cosine_similarity: float
+    id: Optional[int] = None
+    compared_at: Optional[str] = None
+    notes: Optional[str] = None
+
+
 class MemoDatabase:
     """Manages SQLite database for memo transcription data."""
 
@@ -143,7 +185,8 @@ class MemoDatabase:
                     processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     file_hash TEXT,
                     model_used TEXT,
-                    processing_time_seconds REAL
+                    processing_time_seconds REAL,
+                    is_reference INTEGER DEFAULT 0
                 );
 
                 CREATE TABLE IF NOT EXISTS file_exports (
@@ -173,10 +216,35 @@ class MemoDatabase:
                     avg_processing_time REAL
                 );
 
+                CREATE TABLE IF NOT EXISTS transcription_comparisons (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    reference_uuid TEXT NOT NULL,
+                    hypothesis_uuid TEXT NOT NULL,
+                    wer REAL NOT NULL,
+                    cer REAL NOT NULL,
+                    substitutions INTEGER NOT NULL,
+                    deletions INTEGER NOT NULL,
+                    insertions INTEGER NOT NULL,
+                    total_edits INTEGER NOT NULL,
+                    word_count_ref INTEGER NOT NULL,
+                    word_count_hyp INTEGER NOT NULL,
+                    word_count_diff INTEGER NOT NULL,
+                    word_count_diff_pct REAL NOT NULL,
+                    jaccard_similarity REAL NOT NULL,
+                    cosine_similarity REAL NOT NULL,
+                    compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    notes TEXT,
+                    FOREIGN KEY (reference_uuid) REFERENCES transcriptions(uuid),
+                    FOREIGN KEY (hypothesis_uuid) REFERENCES transcriptions(uuid)
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_transcriptions_status ON transcriptions(status);
                 CREATE INDEX IF NOT EXISTS idx_transcriptions_folder ON transcriptions(folder_name);
+                CREATE INDEX IF NOT EXISTS idx_transcriptions_reference ON transcriptions(is_reference);
                 CREATE INDEX IF NOT EXISTS idx_file_exports_uuid ON file_exports(uuid);
                 CREATE INDEX IF NOT EXISTS idx_file_exports_status ON file_exports(export_status);
+                CREATE INDEX IF NOT EXISTS idx_comparisons_reference ON transcription_comparisons(reference_uuid);
+                CREATE INDEX IF NOT EXISTS idx_comparisons_hypothesis ON transcription_comparisons(hypothesis_uuid);
             """)
 
     def get_file_hash(self, file_path: str) -> Optional[str]:
@@ -339,4 +407,99 @@ class MemoDatabase:
                 'transcriptions': transcription_stats,
                 'exports': export_stats
             }
+
+    def mark_as_reference(self, uuid: str) -> None:
+        """Mark a transcription as a reference (ground truth) transcription."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE transcriptions
+                SET is_reference = 1
+                WHERE uuid = ?
+            """, (uuid,))
+
+    def unmark_as_reference(self, uuid: str) -> None:
+        """Remove reference marking from a transcription."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("""
+                UPDATE transcriptions
+                SET is_reference = 0
+                WHERE uuid = ?
+            """, (uuid,))
+
+    def get_reference_transcriptions(self) -> List[TranscriptionRecord]:
+        """Get all transcriptions marked as reference."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM transcriptions
+                WHERE is_reference = 1
+                ORDER BY plain_title
+            """)
+
+            return [TranscriptionRecord(**dict(row)) for row in cursor.fetchall()]
+
+    def save_comparison(self, comparison: ComparisonRecord) -> int:
+        """Save a transcription comparison result."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO transcription_comparisons (
+                    reference_uuid, hypothesis_uuid, wer, cer,
+                    substitutions, deletions, insertions, total_edits,
+                    word_count_ref, word_count_hyp, word_count_diff,
+                    word_count_diff_pct, jaccard_similarity, cosine_similarity,
+                    notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                comparison.reference_uuid, comparison.hypothesis_uuid,
+                comparison.wer, comparison.cer,
+                comparison.substitutions, comparison.deletions,
+                comparison.insertions, comparison.total_edits,
+                comparison.word_count_ref, comparison.word_count_hyp,
+                comparison.word_count_diff, comparison.word_count_diff_pct,
+                comparison.jaccard_similarity, comparison.cosine_similarity,
+                comparison.notes
+            ))
+            return cursor.lastrowid
+
+    def get_comparisons_for_reference(self, reference_uuid: str) -> List[ComparisonRecord]:
+        """Get all comparisons for a specific reference transcription."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT * FROM transcription_comparisons
+                WHERE reference_uuid = ?
+                ORDER BY compared_at DESC
+            """, (reference_uuid,))
+
+            return [ComparisonRecord(**dict(row)) for row in cursor.fetchall()]
+
+    def get_comparison_summary_by_model(self, reference_uuid: str) -> List[Dict[str, Any]]:
+        """Get comparison summary grouped by model for a reference transcription."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT
+                    t.model_used,
+                    COUNT(*) as comparison_count,
+                    AVG(c.wer) as avg_wer,
+                    MIN(c.wer) as min_wer,
+                    MAX(c.wer) as max_wer,
+                    AVG(c.cer) as avg_cer,
+                    AVG(c.jaccard_similarity) as avg_jaccard,
+                    AVG(c.cosine_similarity) as avg_cosine
+                FROM transcription_comparisons c
+                JOIN transcriptions t ON c.hypothesis_uuid = t.uuid
+                WHERE c.reference_uuid = ?
+                GROUP BY t.model_used
+                ORDER BY avg_wer
+            """, (reference_uuid,))
+
+            return [dict(row) for row in cursor.fetchall()]
 

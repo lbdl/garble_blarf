@@ -16,6 +16,7 @@ from .memo_data import VoiceMemoFile
 from .transcriber import transcribe_file
 from .voicememo_db import cli_get_rec_path
 from .database import MemoDatabase, TranscriptionRecord, ExportRecord
+from .model_config import TranscriptionModel, get_default_model
 
 try:
     from tqdm import tqdm
@@ -79,7 +80,8 @@ class MemoOrganiser:
                       transcribe: bool = True,
                       skip_missing: bool = True,
                       framework: bool = True,
-                      max_duration_minutes: float = 8.0) -> List[OrganisedMemo]:
+                      max_duration_minutes: float = 8.0,
+                      model: Optional[TranscriptionModel] = None) -> List[OrganisedMemo]:
         """
         Organise memo files with transcriptions.
 
@@ -87,12 +89,19 @@ class MemoOrganiser:
             memo_files: List of VoiceMemoFile objects
             transcribe: Whether to transcribe audio files
             skip_missing: Whether to skip files that cannot be found (they may not be synced)
-            framework: True for Apple Speech framework, False for local model
+            framework: True for Apple Speech framework, False for local model (deprecated, use model parameter)
             max_duration_minutes: Skip files longer than this (in minutes)
+            model: Transcription model to use (overrides framework parameter)
 
         Returns:
             List of OrganisedMemo objects
         """
+        # Use model parameter if provided, otherwise fall back to framework parameter
+        if model is None:
+            if framework:
+                model = TranscriptionModel.APPLE_SPEECH
+            else:
+                model = get_default_model()
         organised = []
 
         # Start processing batch tracking
@@ -104,9 +113,10 @@ class MemoOrganiser:
                 settings={
                     'skip_missing': skip_missing,
                     'framework': framework,
-                    'max_duration_minutes': max_duration_minutes
+                    'max_duration_minutes': max_duration_minutes,
+                    'model': model.value
                 },
-                model_used='apple_speech' if framework else 'local_whisper'
+                model_used=model.value
             )
 
         # Create single progress bar if tqdm is available
@@ -279,7 +289,7 @@ class MemoOrganiser:
                 # Time the transcription
                 transcription_start = time.time()
                 try:
-                    transcription = transcribe_file(str(full_path))
+                    transcription = transcribe_file(str(full_path), model=model)
                     transcription_time = time.time() - transcription_start
                     total_processing_time += transcription_time
 
@@ -313,7 +323,7 @@ class MemoOrganiser:
                     recording_date=memo.recording_date,
                     processed_at=datetime.now().isoformat(),
                     file_hash=file_hash,
-                    model_used='apple_speech' if framework else 'local_whisper',
+                    model_used=model.value,
                     processing_time_seconds=transcription_time
                 ))
 

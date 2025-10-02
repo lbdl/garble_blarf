@@ -1,8 +1,11 @@
 import Speech
 import time
 import Foundation
+from .model_config import TranscriptionModel, get_model_info
 
-def transcribe_file(file_path: str) -> str:
+
+def transcribe_file_apple_speech(file_path: str) -> str:
+    """Transcribe using Apple Speech Recognition framework."""
     try:
         recogniser = Speech.SFSpeechRecognizer.alloc().init()
 
@@ -46,6 +49,34 @@ def transcribe_file(file_path: str) -> str:
 
     except Exception as e:
         return f"Transcription error: {str(e)}"
+
+
+def transcribe_file(file_path: str, model: TranscriptionModel = TranscriptionModel.APPLE_SPEECH) -> str:
+    """
+    Transcribe an audio file using the specified model.
+
+    Args:
+        file_path: Path to the audio file
+        model: Transcription model to use
+
+    Returns:
+        Transcribed text or error message
+    """
+    model_info = get_model_info(model)
+
+    if model_info.engine == "apple":
+        return transcribe_file_apple_speech(file_path)
+
+    elif model_info.engine == "whisper":
+        from .whisper_transcriber import transcribe_file_whisper
+        return transcribe_file_whisper(file_path, model_info.model_size or "base")
+
+    elif model_info.engine == "faster-whisper":
+        from .faster_whisper_transcriber import transcribe_file_faster_whisper
+        return transcribe_file_faster_whisper(file_path, model_info.model_size or "base")
+
+    else:
+        return f"Unknown transcription engine: {model_info.engine}"
 
 def transcribe_files(paths: list[str]) -> list[str]:
     """Transcribe multiple audio files."""
