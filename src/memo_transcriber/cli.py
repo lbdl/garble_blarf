@@ -228,6 +228,7 @@ def organise(transcribe: bool, folder: Optional[str], max_duration: float, db_pa
                 print(f"  - {model_name}: {display_name}")
             sys.exit(1)
     else:
+        # set in model_config.py
         transcription_model = get_default_model()
 
     print(f"📁 Voice Memos DB: {voice_memos_db}")
@@ -255,37 +256,6 @@ def organise(transcribe: bool, folder: Optional[str], max_duration: float, db_pa
     # Print summary
     summary = organiser.get_transcription_summary(organised)
     print(f"Summary: {summary['success']} success, {summary['failed']} failed, {summary['skipped']} skipped")
-
-@main.command()
-def check_duration() -> None:
-    """Check ZDURATION values to understand the units."""
-    db_path = _get_db()
-    import sqlite3
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT
-            ZCUSTOMLABEL as title,
-            ZDURATION as duration_raw,
-            ZDATE as date_timestamp
-        FROM ZCLOUDRECORDING
-        WHERE ZDURATION IS NOT NULL
-        ORDER BY ZDURATION DESC
-        LIMIT 10
-    """)
-
-    print("Sample ZDURATION values from database:")
-    print("-" * 60)
-    for row in cursor.fetchall():
-        print(f"Title: {row['title'] or 'Untitled'}")
-        print(f"ZDURATION: {row['duration_raw']}")
-        print(f"Date: {row['date_timestamp']}")
-        print("-" * 30)
-
-    conn.close()
 
 @main.command()
 @click.option('--format', 'export_format', default='md', type=click.Choice(['txt', 'md', 'json']), help='Export format (default: md)')

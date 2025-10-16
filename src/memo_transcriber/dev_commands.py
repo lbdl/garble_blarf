@@ -24,6 +24,36 @@ def _get_db() -> str:
 
 def register_dev_commands(main_group: click.Group) -> None:
     """Register development commands with the main CLI group."""
+    @main_group.command()
+    def check_duration() -> None:
+        """Check ZDURATION values to understand the units."""
+        db_path = _get_db()
+        import sqlite3
+
+        conn = sqlite3.connect(db_path)
+        conn.row_factory = sqlite3.Row
+
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT
+                ZCUSTOMLABEL as title,
+                ZDURATION as duration_raw,
+                ZDATE as date_timestamp
+            FROM ZCLOUDRECORDING
+            WHERE ZDURATION IS NOT NULL
+            ORDER BY ZDURATION DESC
+            LIMIT 10
+        """)
+
+        print("Sample ZDURATION values from database:")
+        print("-" * 60)
+        for row in cursor.fetchall():
+            print(f"Title: {row['title'] or 'Untitled'}")
+            print(f"ZDURATION: {row['duration_raw']}")
+            print(f"Date: {row['date_timestamp']}")
+            print("-" * 30)
+
+        conn.close()
 
     @main_group.command()
     @click.option('--limit', default=2, help='Number of files to test with')
