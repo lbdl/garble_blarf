@@ -24,3 +24,30 @@ Reads in the db for voice memos stored in iCloud and transcibes automagically.
 ## Notes on permissions
 
 You'll need to grant the terminal full disk access for this to work.
+
+
+
+<p align="center">
+  <svg viewBox="0 0 1000 200" width="820" xmlns="http://www.w3.org/2000/svg">
+    <style>text { font-family: Arial, sans-serif; fill: #111; }</style>
+
+    <!-- Title -->
+    <text x="50%" y="80" text-anchor="middle" font-size="22">
+      this has been a non usable semi product from ZORG inc.
+      <tspan x="50%" dy="40" font-size="20">
+        Retarding the nation since this afternoon
+      </tspan>
+    </text>
+
+    <!-- Circular TM -->
+    <g transform="translate(885,64)">
+      <circle r="14" fill="none" stroke="#111" stroke-width="2"/>
+      <text y="5" font-size="12" text-anchor="middle">TM</text>
+    </g>
+  </svg>
+</p>
+
+<p align="center">
+  <img src="./assets/zorg-inc-512.png" alt="ZORG Semi Product" width="512">
+</p>
+
