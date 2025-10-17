@@ -14,7 +14,7 @@ There is also a comparisson framework as part of the app so you can just see whi
 The comparison is not the, point the transcription is, the models get downloaded by the client, there are lot of them by default so it may take a while. I will decided which is a decent subset if you add an issue and let me know some stats (see the comparison tool for how to do this, I may just automate it)  
   No idea how good it is anything other than english (again comparisons).  
   
-The application runs from a `cli` i.e from the terminal. If you have no experience with this get ready for a new thrill, the thrill of text and NO BUTTONS, huzzah. If you are on a mac then press the command ley and the space bar, The command button is the one with the ⌘ symbol on it. Now type `teminal` open it.  
+The application runs from a `cli` i.e from the terminal. If you have no experience with this get ready for a new thrill, the thrill of text and NO BUTTONS, huzzah. If you are on a mac then press the command ley and the space bar, The command button is the one with the ⌘ symbol on it. Now type `terminal` open it.  
   
 I will add more instructions but, well, it's a `cli`, there may be a GUI at some point if people request it.
 Reads in the db for voice memos stored in iCloud and transcibes automagically.
