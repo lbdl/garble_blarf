@@ -1,6 +1,6 @@
 # GarbleBlarf
 <p align="center">
-    <img src="./assets/shouting_at_typewriter-1024.png" alt="why speak when you can shout">
+    <img src="./assets/shouting_at_typewriter-512.png" alt="why speak when you can shout">
 </p>
 ## what is it?
 
