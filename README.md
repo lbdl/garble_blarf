@@ -28,13 +28,14 @@ You'll need to grant the terminal full disk access for this to work.
 ## Who We Are (not)
 
 <p align="center">
-  <span style="font-family: Arial, sans-serif; font-size: 22px;">
-    this has been a non usable semi product from ZORG inc.<span style="font-size: 80%;">™⃝</span>
+  <span style="font-family: monospace; font-size: 22px;">
+    This has been a non usable semi product from ZORG inc.<span style="font-size: 80%;">
+        <span style="display:inline-block;border:1px solid #111;border-radius:50%;padding:0 3px;font-size:70%;line-height:1;vertical-align:middle;">TM</span>
   </span>
 </p>
 
 <p align="center" style="margin-top:4px;">
-  <span style="font-family: Arial, sans-serif; font-size: 18px;">
+  <span style="font-family: monospace; font-size: 22px;">
     Retarding the nation since this afternoon, ZORGs Industrials<span style="font-size: 80%;">™⃝</span>
   </span>
 </p>
