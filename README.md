@@ -32,16 +32,7 @@ You'll need to grant the terminal full disk access for this to work.
 ## Who We Are (not)
 
 <p align="center">
-  <span style="font-family: monospace; font-size: 22px;">
-    This has been a non usable semi product from ZORG inc.&trade;
-  </span>
+  <img src="./assets/zorg-inc-text-512.png" alt="ZORG Semi Product">
 </p>
-<p align="center">
-  <img src="./assets/zorg-inc-512.png" alt="ZORG Semi Product">
-</p>
-<p align="center" style="margin-top:4px;">
-  <span style="font-family: monospace; font-size: 22px;">
-    Retarding the nation since this afternoon, ZORG's Industrials&trade;
-  </span>
-</p>
+
 
