@@ -1,5 +1,7 @@
 # GarbleBlarf
-![is this thing on?](./assets/shouting_at_typewriter-1024.png)
+<p align="center">
+    <img src="./assets/shouting_at_typewriter-1024.png" alt="why speak when you can shout">
+</p>
 ## what is it?
 
 We take synced audio (using iCloud right now) from the laptop folder i.e from a known zero config directory, this can of course be configured but right now it "just works" how I hate that term, how rarely do these things just work, anyway.  
