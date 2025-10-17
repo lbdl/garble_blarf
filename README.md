@@ -27,25 +27,23 @@ You'll need to grant the terminal full disk access for this to work.
 
 
 
-<p align="center">
-  <svg viewBox="0 0 1000 220" width="100%" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title">
-    <title>this has been a non usable semi product from ZORG inc. — Retarding the nation since this afternoon</title>
 
-    <!-- Title: two lines, centered -->
-    <text x="50%" y="90" text-anchor="middle" font-size="48" font-family="Arial, sans-serif" fill="#111">
-      this has been a non usable semi product from ZORG inc.
-    </text>
-    <text x="50%" y="155" text-anchor="middle" font-size="40" font-family="Arial, sans-serif" fill="#111">
-      Retarding the nation since this afternoon
-    </text>
-
-    <!-- Circular TM badge (positions scale with the SVG) -->
-    <g transform="translate(900,70)">
-      <circle r="20" fill="none" stroke="#111" stroke-width="3"/>
-      <text y="6" text-anchor="middle" font-size="18" font-family="Arial, sans-serif" fill="#111">TM</text>
-    </g>
+<p align="center" style="margin-bottom: 0;">
+  <span style="font-family: Arial, sans-serif; font-size: 22px;">
+    this has been a non usable semi product from ZORG inc.
+  </span>
+  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" style="vertical-align: middle; margin-left: 4px;">
+    <circle cx="12" cy="12" r="10" fill="none" stroke="#111" stroke-width="2"/>
+    <text x="12" y="16" text-anchor="middle" font-size="10" font-family="Arial, sans-serif" fill="#111">TM</text>
   </svg>
 </p>
+
+<p align="center" style="margin-top: 4px;">
+  <span style="font-family: Arial, sans-serif; font-size: 18px;">
+    Retarding the nation since this afternoon
+  </span>
+</p>
+
 
 <p align="center">
   <img src="./assets/zorg-inc-512.png" alt="ZORG Semi Product" width="60%">
