@@ -2,6 +2,7 @@
 <p align="center">
     <img src="./assets/shouting_at_typewriter-512.png" alt="why speak when you can shout">
 </p>
+
 ## what is it?
 
 We take synced audio (using iCloud right now) from the laptop folder i.e from a known zero config directory, this can of course be configured but right now it "just works" how I hate that term, how rarely do these things just work, anyway.  
@@ -21,8 +22,11 @@ Reads in the db for voice memos stored in iCloud and transcibes automagically.
 ## how does it work?
   We take audio files from the the default store for iCloud sync and then run them through a model, either the default framework on a mac or a small (ish) embedded transcription model and then dump this into a database, these can then be dumped out to the the local filesystem to a configurable "somewhere", by default we use the `Documents` directory. It is useful to keep then in this db because it makes it easier for later tools to search this, it's just faster and, well, it's a database and thats what they are for.
 
-## Notes on permissions
+## How to use
 
+tbh your guess is as good as mine at this point... see the wiki
+
+## Notes on permissions
 You'll need to grant the terminal full disk access for this to work.
 
 ## Who We Are (not)
