@@ -25,28 +25,22 @@ Reads in the db for voice memos stored in iCloud and transcibes automagically.
 
 You'll need to grant the terminal full disk access for this to work.
 
-
-
-
-<p align="center" style="margin-bottom: 0;">
-  <span style="font-family: Arial, sans-serif; font-size: 22px;">
-    this has been a non usable semi product from ZORG inc.
-  </span>
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" style="vertical-align: middle; margin-left: 4px;">
-    <circle cx="12" cy="12" r="10" fill="none" stroke="#111" stroke-width="2"/>
-    <text x="12" y="16" text-anchor="middle" font-size="10" font-family="Arial, sans-serif" fill="#111">TM</text>
-  </svg>
-</p>
-
-<p align="center" style="margin-top: 4px;">
-  <span style="font-family: Arial, sans-serif; font-size: 18px;">
-    Retarding the nation since this afternoon
-  </span>
-</p>
-
+## Who We Are (not)
 
 <p align="center">
-  <img src="./assets/zorg-inc-512.png" alt="ZORG Semi Product" width="60%">
+  <span style="font-family: Arial, sans-serif; font-size: 22px;">
+    this has been a non usable semi product from ZORG inc.<span style="font-size: 80%;">™⃝</span>
+  </span>
+</p>
+
+<p align="center" style="margin-top:4px;">
+  <span style="font-family: Arial, sans-serif; font-size: 18px;">
+    Retarding the nation since this afternoon, ZORGs Industrials<span style="font-size: 80%;">™⃝</span>
+  </span>
+</p>
+
+<p align="center">
+  <img src="./assets/zorg-inc-512.png" alt="ZORG Semi Product">
 </p>
 
 
