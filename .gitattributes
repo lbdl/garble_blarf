@@ -1,0 +1,2 @@
+# Prevent dev_tools from being merged into main branch
+src/memo_transcriber/dev_tools/** merge=ours
