@@ -26,6 +26,49 @@ We take audio files from the the default store for iCloud sync and then run them
 ## How to use
 tbh your guess is as good as mine at this point... see the wiki
 
+## Local Dev
+
+This project uses a hybrid setup with `pyenv` for Python version management and `uv` for blazingly fast dependency management (10-100x faster than regular pip, allegedly).
+
+### Setup
+
+```bash
+# 1. Python is managed by pyenv virtualenv, we asume you are in fact using pyenv and pyenv virtualenv to manage things
+# the setup of this is not covered here, see the wiki, section `Local Dev`
+# The .python-version file contains "voice_transcription"
+# This auto-activates when you cd into the project directory
+
+# 2. Install dependencies using uv (installs into the active pyenv virtualenv)
+uv pip install -e ".[dev]"
+
+# That's it. No really.
+```
+
+### Running Commands
+
+Since the pyenv virtualenv auto-activates, you can run commands directly:
+
+```bash
+memo-transcriber --help      # Production CLI
+comparator --help            # Model comparison CLI
+
+# Examples
+memo-transcriber organise --model faster-whisper-base --max-duration 10
+memo-transcriber db-stats
+comparator compare-all <UUID>
+```
+
+### Alternative: Modern uv workflow
+
+If you prefer the new hotness:
+
+```bash
+uv sync --extra dev          # Installs everything in editable mode
+uv run memo-transcriber --help
+```
+
+**Why the hybrid?** pyenv manages Python versions (because we need 3.13+), uv manages packages (because waiting for pip is so 2023).
+
 ## Notes on permissions
 You'll need to grant the terminal full disk access for this to work.
 
