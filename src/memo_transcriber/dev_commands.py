@@ -12,6 +12,7 @@ from .database import MemoDatabase, get_user_data_dir, ComparisonRecord
 from .voice_memos_printer import VoiceMemosPrinter
 from .transcriber import transcribe_file as transcribe_audio
 from .comparison import compare_transcriptions
+from .cli_output import CliPrinter, OutputStyle
 
 
 def _get_db() -> str:
@@ -120,31 +121,33 @@ def register_dev_commands(main_group: click.Group) -> None:
             db = MemoDatabase(str(db_path))
             stats = db.get_processing_stats()
 
-            print(f"🗄️  Test Database: {db_path}")
-            print("=" * 50)
+            CliPrinter.section_start(f"Test Database: {db_path}", OutputStyle.DATABASE)
 
             # Transcription statistics
             if 'transcriptions' in stats and stats['transcriptions']:
-                print("\nTranscription Summary:")
+                CliPrinter.blank_line()
+                CliPrinter.info("Transcription Summary:")
                 for status, data in stats['transcriptions'].items():
                     count = data['count']
                     avg_time = data.get('avg_time', 0) or 0
                     total_duration = data.get('total_duration', 0) or 0
-                    print(f"  {status.capitalize()}: {count} files")
+                    CliPrinter.kv(f"{status.capitalize()}", f"{count} files", indent_level=1)
                     if avg_time > 0:
-                        print(f"    Avg processing time: {avg_time:.2f}s")
+                        CliPrinter.kv("Avg processing time", f"{avg_time:.2f}s", indent_level=2)
                     if total_duration > 0:
-                        print(f"    Total audio duration: {total_duration/60:.1f} minutes")
+                        CliPrinter.kv("Total audio duration", f"{total_duration/60:.1f} minutes", indent_level=2)
             else:
-                print("\nNo transcriptions found in test database")
+                CliPrinter.blank_line()
+                CliPrinter.info("No transcriptions found in test database")
 
             # Get unexported count
             unexported = db.get_unexported_transcriptions()
             if unexported:
-                print(f"\nUnexported transcriptions: {len(unexported)} files ready for export")
+                CliPrinter.blank_line()
+                CliPrinter.info(f"Unexported transcriptions: {len(unexported)} files ready for export")
 
         except Exception as e:
-            print(f"Error reading test database: {e}")
+            CliPrinter.error("Error reading test database", e)
 
     @main_group.command()
     def dev_clean() -> None:

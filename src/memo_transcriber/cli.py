@@ -12,6 +12,7 @@ from .memo_organiser import MemoOrganiser
 from .database import MemoDatabase, get_user_data_dir
 from .model_config import TranscriptionModel, list_available_models, get_default_model
 from .voice_memos_printer import VoiceMemosPrinter
+from .cli_output import CliPrinter, OutputStyle
 
 def _get_db():
     """Get Voice Memos database path."""
@@ -68,40 +69,44 @@ def db_stats(db_path: Optional[str]) -> None:
         db = MemoDatabase(db_path)
         stats = db.get_processing_stats()
 
-        print(f"📊 Database: {db_path}")
-        print("=" * 70)
+        CliPrinter.section_start(f"Database: {db_path}", OutputStyle.STATS)
 
         # Transcription statistics
         if 'transcriptions' in stats and stats['transcriptions']:
-            print("\nTranscription Summary:")
+            CliPrinter.blank_line()
+            CliPrinter.info("Transcription Summary:")
             for status, data in stats['transcriptions'].items():
                 count = data['count']
                 avg_time = data.get('avg_time', 0) or 0
                 total_duration = data.get('total_duration', 0) or 0
-                print(f"  {status.capitalize()}: {count} files")
+                CliPrinter.kv(f"{status.capitalize()}", f"{count} files", indent_level=1)
                 if avg_time > 0:
-                    print(f"    Avg processing time: {avg_time:.2f}s")
+                    CliPrinter.kv("Avg processing time", f"{avg_time:.2f}s", indent_level=2)
                 if total_duration > 0:
-                    print(f"    Total audio duration: {total_duration/60:.1f} minutes")
+                    CliPrinter.kv("Total audio duration", f"{total_duration/60:.1f} minutes", indent_level=2)
         else:
-            print("\nNo transcriptions found in database")
+            CliPrinter.blank_line()
+            CliPrinter.info("No transcriptions found in database")
 
         # Export statistics
         if 'exports' in stats and stats['exports']:
-            print("\nExport Summary:")
+            CliPrinter.blank_line()
+            CliPrinter.info("Export Summary:")
             for status, data in stats['exports'].items():
                 count = data['count']
-                print(f"  {status.capitalize()}: {count} files")
+                CliPrinter.kv(f"{status.capitalize()}", f"{count} files", indent_level=1)
         else:
-            print("\nNo exports recorded yet")
+            CliPrinter.blank_line()
+            CliPrinter.info("No exports recorded yet")
 
         # Get unexported count
         unexported = db.get_unexported_transcriptions()
         if unexported:
-            print(f"\nUnexported transcriptions: {len(unexported)} files ready for export")
+            CliPrinter.blank_line()
+            CliPrinter.info(f"Unexported transcriptions: {len(unexported)} files ready for export")
 
     except Exception as e:
-        print(f"Error reading database: {e}")
+        CliPrinter.error("Error reading database", e)
 
 @main.command()
 @click.option('--db-path', default=None, help='Path to transcription database')
@@ -252,11 +257,11 @@ def export(export_format: str, output_dir: str, export_all: bool, force: bool, s
         # Initialize organiser with output directory
         organiser = MemoOrganiser(output=output_dir, db_path=db_path)
 
-        print(f"📤 Exporting transcriptions...")
-        print(f"   Format: {export_format}")
-        print(f"   Output: {output_dir}")
-        print(f"   Database: {db_path}")
-        print("=" * 70)
+        CliPrinter.header("Exporting transcriptions...", OutputStyle.EXPORT)
+        CliPrinter.kv("Format", export_format)
+        CliPrinter.kv("Output", output_dir)
+        CliPrinter.kv("Database", db_path)
+        CliPrinter.separator()
 
         # Export transcriptions
         stats = organiser.export_transcriptions(
@@ -267,18 +272,20 @@ def export(export_format: str, output_dir: str, export_all: bool, force: bool, s
         )
 
         # Print summary
-        print("\n" + "=" * 70)
-        print(f"📊 Export Summary:")
-        print(f"   Total: {stats['total']}")
-        print(f"   Exported: {stats['exported']}")
-        print(f"   Skipped: {stats['skipped']}")
-        print(f"   Failed: {stats['failed']}")
+        CliPrinter.blank_line()
+        CliPrinter.separator()
+        CliPrinter.header("Export Summary:", OutputStyle.STATS)
+        CliPrinter.kv("Total", stats['total'])
+        CliPrinter.kv("Exported", stats['exported'])
+        CliPrinter.kv("Skipped", stats['skipped'])
+        CliPrinter.kv("Failed", stats['failed'])
 
         if stats['exported'] > 0:
-            print(f"\n✅ Successfully exported {stats['exported']} files to {output_dir}")
+            CliPrinter.blank_line()
+            CliPrinter.success(f"Successfully exported {stats['exported']} files to {output_dir}")
 
     except Exception as e:
-        print(f"❌ Export failed: {e}")
+        CliPrinter.error("Export failed", e)
 
 
 # Load development commands if in dev mode
