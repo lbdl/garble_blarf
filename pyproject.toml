@@ -27,7 +27,6 @@ comparator = "memo_transcriber.comparator:main"
 packages = ["src/memo_transcriber"]
 # Exclude development files from production builds
 exclude = [
-    "src/memo_transcriber/dev_tools/**",
     "test_*.db",
     "*.db-journal",
     ".dev"
@@ -36,7 +35,6 @@ exclude = [
 [tool.hatch.build.targets.sdist]
 # Also exclude from source distribution
 exclude = [
-    "src/memo_transcriber/dev_tools/**",
     "test_*.db",
     "*.db-journal",
     ".dev"
