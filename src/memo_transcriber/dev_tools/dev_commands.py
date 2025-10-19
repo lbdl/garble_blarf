@@ -5,15 +5,15 @@ This module is excluded from production builds.
 
 from typing import Optional
 import click
-from .voicememo_db import cli_get_db_path, cli_get_rec_path, get_schema
-from .memo_data import get_memo_data
-from .memo_organiser import MemoOrganiser
-from .database import MemoDatabase, get_user_data_dir, ComparisonRecord
-from .voice_memos_printer import VoiceMemosPrinter
-from .transcriber import transcribe_file as transcribe_audio
-from .comparison import compare_transcriptions
-from .cli_output import CliPrinter, OutputStyle
-from .printer import Printer
+from ..voicememo_db import cli_get_db_path, cli_get_rec_path, get_schema
+from ..memo_data import get_memo_data
+from ..memo_organiser import MemoOrganiser
+from ..database import MemoDatabase, get_user_data_dir, ComparisonRecord
+from ..voice_memos_printer import VoiceMemosPrinter
+from ..transcriber import transcribe_file as transcribe_audio
+from ..comparison import compare_transcriptions
+from ..cli_output import CliPrinter, OutputStyle
+from ..printer import Printer
 
 
 def _get_db() -> str:
