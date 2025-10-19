@@ -37,20 +37,7 @@ def list_models() -> None:
     """List all available transcription models."""
     from .model_config import MODEL_INFO
 
-    print("Available Transcription Models:")
-    print("=" * 70)
-
-    for model, info in MODEL_INFO.items():
-        print(f"\n🤖 {model.value}")
-        print(f"   Name: {info.display_name}")
-        print(f"   Engine: {info.engine}")
-        print(f"   Speed: {info.relative_speed}")
-        print(f"   Accuracy: {info.relative_accuracy}")
-        print(f"   Description: {info.description}")
-
-    print("\n" + "=" * 70)
-    print(f"Default model: {get_default_model().value}")
-    print("\nUsage: memo-transcriber organise --model <model-name>")
+    Printer.print_models_list(MODEL_INFO, get_default_model())
 
 @main.command()
 def filetree() -> None:
@@ -135,18 +122,14 @@ def organise(transcribe: bool, folder: Optional[str], max_duration: float, db_pa
         try:
             transcription_model = TranscriptionModel(model)
         except ValueError:
-            print(f"❌ Invalid model: {model}")
-            print("\nAvailable models:")
-            for model_name, display_name in list_available_models():
-                print(f"  - {model_name}: {display_name}")
+            Printer.print_invalid_model_error(model, list_available_models())
             sys.exit(1)
     else:
         # set in model_config.py
         transcription_model = get_default_model()
 
-    print(f"📁 Voice Memos DB: {voice_memos_db}")
-    print(f"💾 Transcription DB: {db_path}")
-    print(f"🤖 Model: {transcription_model.value}")
+    # Print header
+    Printer.print_organise_header(voice_memos_db, db_path, transcription_model.value)
 
     organiser = MemoOrganiser(db_path=db_path)
     organised = organiser.organise_memos(memo_files, transcribe=transcribe, max_duration_minutes=max_duration, model=transcription_model)
@@ -157,18 +140,11 @@ def organise(transcribe: bool, folder: Optional[str], max_duration: float, db_pa
 
     # Print results
     for memo in organised:
-        print(f"📝 {memo.plain_title}")
-        print(f"   Status: {memo.status}")
-        print(f"   Folder: {memo.folder}")
-        if memo.status == 'success':
-            print(f"   Transcript: {memo.transcription[:100]}...")
-        elif memo.status == 'failed':
-            print(f"   Error: {memo.transcription}")
-        print()
+        Printer.print_organised_memo(memo)
 
     # Print summary
     summary = organiser.get_transcription_summary(organised)
-    print(f"Summary: {summary['success']} success, {summary['failed']} failed, {summary['skipped']} skipped")
+    Printer.print_organise_summary(summary)
 
 @main.command()
 @click.option('--format', 'export_format', default='md', type=click.Choice(['txt', 'md', 'json']), help='Export format (default: md)')

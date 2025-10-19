@@ -216,3 +216,87 @@ class Printer:
         else:
             for record in records:
                 Printer.print_transcription_detailed(record)
+
+    @staticmethod
+    def print_models_list(model_info_dict: Dict[Any, Any], default_model: Any) -> None:
+        """Print list of available transcription models.
+
+        Args:
+            model_info_dict: Dictionary mapping model enum to ModelInfo objects
+            default_model: The default model enum value
+        """
+        CliPrinter.header("Available Transcription Models:")
+        CliPrinter.separator()
+
+        for model, info in model_info_dict.items():
+            CliPrinter.blank_line()
+            CliPrinter.header(model.value, OutputStyle.ROBOT)
+            CliPrinter.kv("Name", info.display_name)
+            CliPrinter.kv("Engine", info.engine)
+            CliPrinter.kv("Speed", info.relative_speed)
+            CliPrinter.kv("Accuracy", info.relative_accuracy)
+            CliPrinter.kv("Description", info.description)
+
+        CliPrinter.blank_line()
+        CliPrinter.separator()
+        CliPrinter.info(f"Default model: {default_model.value}")
+        CliPrinter.blank_line()
+        CliPrinter.info("Usage: memo-transcriber organise --model <model-name>")
+
+    @staticmethod
+    def print_invalid_model_error(model: str, available_models: List[tuple]) -> None:
+        """Print error message for invalid model selection.
+
+        Args:
+            model: The invalid model name
+            available_models: List of (model_name, display_name) tuples
+        """
+        CliPrinter.error(f"Invalid model: {model}")
+        CliPrinter.blank_line()
+        CliPrinter.info("Available models:")
+        for model_name, display_name in available_models:
+            CliPrinter.kv(model_name, display_name, indent_level=1)
+
+    @staticmethod
+    def print_organise_header(voice_memos_db: str, transcription_db: str, model: str) -> None:
+        """Print header for organise command.
+
+        Args:
+            voice_memos_db: Path to voice memos database
+            transcription_db: Path to transcription database
+            model: Model name being used
+        """
+        CliPrinter.header(f"Voice Memos DB: {voice_memos_db}", OutputStyle.FOLDER)
+        CliPrinter.header(f"Transcription DB: {transcription_db}", OutputStyle.DATABASE)
+        CliPrinter.header(f"Model: {model}", OutputStyle.ROBOT)
+
+    @staticmethod
+    def print_organised_memo(memo: Any) -> None:
+        """Print a single organised memo result.
+
+        Args:
+            memo: Memo object with plain_title, status, folder, transcription attributes
+        """
+        CliPrinter.header(memo.plain_title, OutputStyle.NOTE)
+        CliPrinter.kv("Status", memo.status)
+        CliPrinter.kv("Folder", memo.folder)
+
+        if memo.status == 'success':
+            preview = memo.transcription[:100] if len(memo.transcription) > 100 else memo.transcription
+            suffix = "..." if len(memo.transcription) > 100 else ""
+            CliPrinter.kv("Transcript", f"{preview}{suffix}")
+        elif memo.status == 'failed':
+            CliPrinter.kv("Error", memo.transcription)
+
+        CliPrinter.blank_line()
+
+    @staticmethod
+    def print_organise_summary(summary: Dict[str, int]) -> None:
+        """Print summary of organise operation.
+
+        Args:
+            summary: Dictionary with 'success', 'failed', 'skipped' counts
+        """
+        CliPrinter.info(
+            f"Summary: {summary['success']} success, {summary['failed']} failed, {summary['skipped']} skipped"
+        )
