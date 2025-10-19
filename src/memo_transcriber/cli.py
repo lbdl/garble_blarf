@@ -6,15 +6,12 @@ cli implementaion for package:
 import sys
 from typing import Optional
 import click
-from .voice_memos_printer import VoiceMemosPrinter
-from .voicememo_db import cli_get_db_path, cli_get_rec_path, get_schema
+from .voicememo_db import cli_get_db_path
 from .memo_data import get_memo_data
 from .memo_organiser import MemoOrganiser
-from .database import MemoDatabase, get_user_data_dir, ComparisonRecord
-from pathlib import Path
-from .transcriber import transcribe_file as transcribe_audio
+from .database import MemoDatabase, get_user_data_dir
 from .model_config import TranscriptionModel, list_available_models, get_default_model
-from .comparison import compare_transcriptions
+from .voice_memos_printer import VoiceMemosPrinter
 
 def _get_db():
     """Get Voice Memos database path."""
@@ -32,10 +29,6 @@ def _get_default_transcription_db():
 @click.group()
 def main() -> None:
     pass
-
-@main.command()
-def db_schema() -> None:
-    get_schema()
 
 @main.command()
 def list_models() -> None:
@@ -58,25 +51,11 @@ def list_models() -> None:
     print("\nUsage: memo-transcriber organise --model <model-name>")
 
 @main.command()
-def example() -> None:
-    db_path = _get_db()
-    VoiceMemosPrinter.example_usage_patterns(db_path)
-
-@main.command()
 def filetree() -> None:
+    """Display memo file structure and organization."""
     db_path = _get_db()
     records = get_memo_data(db_path)
     VoiceMemosPrinter.print_memo_files(records)
-
-@main.command()
-def test_transcribe() -> None:
-    fp_base = cli_get_rec_path()
-    testfile = "20180114 132606-76050490.m4a"
-    testfile2 = "20170421 092405-852A1FFE.m4a"
-    fp = fp_base / testfile
-    fp2 = fp_base / testfile2
-    res = transcribe_audio(str(fp2))
-    print(f"{res}")
 
 @main.command()
 @click.option('--db-path', default=None, help='Path to transcription database')
@@ -127,7 +106,7 @@ def db_stats(db_path: Optional[str]) -> None:
 @main.command()
 @click.option('--db-path', default=None, help='Path to transcription database')
 @click.option('--status', help='Filter by status (success, failed, skipped)')
-@click.option('--limit', default=10, help='Maximum number of records to show, 0 = shoe all records')
+@click.option('--limit', default=10, help='Maximum number of records to show, 0 = show all records')
 @click.option('--compact', is_flag=True, help='Show compact view with just title and status')
 def list_cached(db_path: Optional[str], status: Optional[str], limit: int, compact: bool) -> None:
     """List cached transcriptions from database."""
@@ -300,260 +279,6 @@ def export(export_format: str, output_dir: str, export_all: bool, force: bool, s
 
     except Exception as e:
         print(f"❌ Export failed: {e}")
-
-
-@main.command()
-@click.option('--output', default='memo_transcriber_schema.er', help='Output file path for ERD')
-@click.option('--render', is_flag=True, help='Also render to SVG/PNG if erd tool is available')
-def generate_erd(output: str, render: bool) -> None:
-    """Generate ERD (Entity Relationship Diagram) of the database schema."""
-    try:
-        # Use default database path for schema (doesn't need data)
-        db = MemoDatabase()
-        erd_path = db.generate_erd(output)
-
-        print(f"📊 ERD markup generated: {erd_path}")
-
-        if render:
-            # Try to render with erd tool
-            import subprocess
-            try:
-                # Try SVG first
-                svg_path = erd_path.replace('.er', '.svg')
-                result = subprocess.run(['erd', '-f', 'svg', '-i', erd_path, '-o', svg_path],
-                                      capture_output=True, text=True)
-                if result.returncode == 0:
-                    print(f"🎨 SVG diagram rendered: {svg_path}")
-                else:
-                    print(f"⚠️  Could not render SVG: {result.stderr}")
-
-                # Try PNG as fallback
-                png_path = erd_path.replace('.er', '.png')
-                result = subprocess.run(['erd', '-f', 'png', '-i', erd_path, '-o', png_path],
-                                      capture_output=True, text=True)
-                if result.returncode == 0:
-                    print(f"🎨 PNG diagram rendered: {png_path}")
-                else:
-                    print(f"⚠️  Could not render PNG: {result.stderr}")
-
-            except FileNotFoundError:
-                print("⚠️  'erd' tool not found. Install with: brew install erd")
-                print("   Or manually render with: erd -f svg -i schema.er -o schema.svg")
-        else:
-            print("💡 To render: erd -f svg -i schema.er -o schema.svg")
-            print("   Install erd tool: brew install erd")
-
-    except Exception as e:
-        print(f"Error generating ERD: {e}")
-
-
-@main.command()
-@click.argument('uuid')
-@click.option('--db-path', default=None, help='Path to transcription database')
-def mark_reference(uuid: str, db_path: Optional[str]) -> None:
-    """Mark a transcription as a reference (ground truth) for comparison."""
-    if db_path is None:
-        db_path = _get_default_transcription_db()
-
-    try:
-        db = MemoDatabase(db_path)
-
-        # Check if transcription exists
-        record = db.get_transcription(uuid)
-        if not record:
-            print(f"❌ No transcription found with UUID: {uuid}")
-            return
-
-        if record.status != 'success':
-            print(f"⚠️  Warning: This transcription has status '{record.status}' (not 'success')")
-            if not click.confirm("Mark as reference anyway?"):
-                return
-
-        db.mark_as_reference(uuid)
-        print(f"✅ Marked as reference: {record.plain_title}")
-        print(f"   UUID: {uuid}")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
-
-@main.command()
-@click.option('--db-path', default=None, help='Path to transcription database')
-def list_references(db_path: Optional[str]) -> None:
-    """List all reference transcriptions."""
-    if db_path is None:
-        db_path = _get_default_transcription_db()
-
-    try:
-        db = MemoDatabase(db_path)
-        references = db.get_reference_transcriptions()
-
-        if not references:
-            print("No reference transcriptions found.")
-            print("\nTo mark a transcription as reference:")
-            print("  memo-transcriber mark-reference <uuid>")
-            return
-
-        print(f"Reference Transcriptions ({len(references)}):")
-        print("=" * 70)
-
-        for ref in references:
-            duration_min = (ref.duration_seconds or 0) / 60.0
-            word_count = len(ref.transcription.split())
-
-            print(f"\n📌 {ref.plain_title}")
-            print(f"   UUID: {ref.uuid}")
-            print(f"   Folder: {ref.folder_name}")
-            print(f"   Model: {ref.model_used or 'unknown'}")
-            print(f"   Duration: {duration_min:.1f} min")
-            print(f"   Word count: {word_count}")
-            print(f"   Processed: {ref.processed_at}")
-
-            # Show comparison count if any
-            comparisons = db.get_comparisons_for_reference(ref.uuid)
-            if comparisons:
-                print(f"   Comparisons: {len(comparisons)}")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
-
-@main.command()
-@click.argument('reference_uuid')
-@click.argument('hypothesis_uuid')
-@click.option('--db-path', default=None, help='Path to transcription database')
-@click.option('--notes', help='Optional notes about this comparison')
-def compare(reference_uuid: str, hypothesis_uuid: str, db_path: Optional[str], notes: Optional[str]) -> None:
-    """Compare two transcriptions and calculate accuracy metrics."""
-    if db_path is None:
-        db_path = _get_default_transcription_db()
-
-    try:
-        db = MemoDatabase(db_path)
-
-        # Get both transcriptions
-        reference = db.get_transcription(reference_uuid)
-        hypothesis = db.get_transcription(hypothesis_uuid)
-
-        if not reference:
-            print(f"❌ Reference transcription not found: {reference_uuid}")
-            return
-
-        if not hypothesis:
-            print(f"❌ Hypothesis transcription not found: {hypothesis_uuid}")
-            return
-
-        print(f"📊 Comparing transcriptions...")
-        print(f"   Reference: {reference.plain_title} ({reference.model_used or 'unknown'})")
-        print(f"   Hypothesis: {hypothesis.plain_title} ({hypothesis.model_used or 'unknown'})")
-        print("=" * 70)
-
-        # Run comparison
-        results = compare_transcriptions(
-            reference.transcription,
-            hypothesis.transcription,
-            normalize=True
-        )
-
-        # Display results
-        print(f"\n📈 Accuracy Metrics:")
-        print(f"   Word Error Rate (WER): {results['wer']:.2%}")
-        print(f"   Character Error Rate (CER): {results['cer']:.2%}")
-        print(f"\n📝 Edit Operations:")
-        print(f"   Substitutions: {results['substitutions']}")
-        print(f"   Deletions: {results['deletions']}")
-        print(f"   Insertions: {results['insertions']}")
-        print(f"   Total edits: {results['total_edits']}")
-        print(f"\n📊 Word Counts:")
-        print(f"   Reference: {results['word_count_ref']} words")
-        print(f"   Hypothesis: {results['word_count_hyp']} words")
-        print(f"   Difference: {results['word_count_diff']:+d} ({results['word_count_diff_pct']:+.1f}%)")
-        print(f"\n🔍 Similarity Scores:")
-        print(f"   Jaccard similarity: {results['jaccard_similarity']:.2%}")
-        print(f"   Cosine similarity: {results['cosine_similarity']:.2%}")
-
-        # Save to database
-        comparison_record = ComparisonRecord(
-            reference_uuid=reference_uuid,
-            hypothesis_uuid=hypothesis_uuid,
-            wer=results['wer'],
-            cer=results['cer'],
-            substitutions=results['substitutions'],
-            deletions=results['deletions'],
-            insertions=results['insertions'],
-            total_edits=results['total_edits'],
-            word_count_ref=results['word_count_ref'],
-            word_count_hyp=results['word_count_hyp'],
-            word_count_diff=results['word_count_diff'],
-            word_count_diff_pct=results['word_count_diff_pct'],
-            jaccard_similarity=results['jaccard_similarity'],
-            cosine_similarity=results['cosine_similarity'],
-            notes=notes
-        )
-
-        comparison_id = db.save_comparison(comparison_record)
-        print(f"\n✅ Comparison saved (ID: {comparison_id})")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
-
-
-@main.command()
-@click.argument('reference_uuid')
-@click.option('--db-path', default=None, help='Path to transcription database')
-def comparison_summary(reference_uuid: str, db_path: Optional[str]) -> None:
-    """Show comparison summary for a reference transcription, grouped by model."""
-    if db_path is None:
-        db_path = _get_default_transcription_db()
-
-    try:
-        db = MemoDatabase(db_path)
-
-        # Get reference
-        reference = db.get_transcription(reference_uuid)
-        if not reference:
-            print(f"❌ Reference transcription not found: {reference_uuid}")
-            return
-
-        print(f"📊 Comparison Summary for: {reference.plain_title}")
-        print(f"   UUID: {reference_uuid}")
-        print("=" * 70)
-
-        # Get summary by model
-        summary = db.get_comparison_summary_by_model(reference_uuid)
-
-        if not summary:
-            print("\nNo comparisons found for this reference.")
-            print("\nTo compare transcriptions:")
-            print("  memo-transcriber compare <reference-uuid> <hypothesis-uuid>")
-            return
-
-        print(f"\nModel Performance (sorted by WER, lower is better):")
-        print("-" * 70)
-
-        for model_stats in summary:
-            model = model_stats['model_used'] or 'unknown'
-            count = model_stats['comparison_count']
-            avg_wer = model_stats['avg_wer']
-            min_wer = model_stats['min_wer']
-            max_wer = model_stats['max_wer']
-            avg_cer = model_stats['avg_cer']
-            avg_jaccard = model_stats['avg_jaccard']
-            avg_cosine = model_stats['avg_cosine']
-
-            print(f"\n🤖 {model} ({count} comparison{'s' if count != 1 else ''})")
-            print(f"   WER: {avg_wer:.2%} (min: {min_wer:.2%}, max: {max_wer:.2%})")
-            print(f"   CER: {avg_cer:.2%}")
-            print(f"   Jaccard similarity: {avg_jaccard:.2%}")
-            print(f"   Cosine similarity: {avg_cosine:.2%}")
-
-        # Find best model
-        best_model = summary[0]
-        print("\n" + "=" * 70)
-        print(f"🏆 Best performing model: {best_model['model_used']} (WER: {best_model['avg_wer']:.2%})")
-
-    except Exception as e:
-        print(f"❌ Error: {e}")
 
 
 # Load development commands if in dev mode
