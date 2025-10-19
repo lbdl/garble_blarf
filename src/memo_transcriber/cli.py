@@ -12,7 +12,7 @@ from .memo_organiser import MemoOrganiser
 from .database import MemoDatabase, get_user_data_dir
 from .model_config import TranscriptionModel, list_available_models, get_default_model
 from .voice_memos_printer import VoiceMemosPrinter
-from .cli_output import CliPrinter, OutputStyle
+from .cli_output import CliPrinter
 from .printer import Printer
 
 def _get_db():
@@ -178,14 +178,4 @@ def export(export_format: str, output_dir: str, export_all: bool, force: bool, s
 
     except Exception as e:
         Printer.print_export_error(e)
-
-
-# Load development commands if in dev mode
-import os
-if os.getenv('MEMO_DEV_MODE') or os.path.exists('.dev') or os.path.exists('pyproject.toml'):
-    try:
-        from .dev_commands import register_dev_commands
-        register_dev_commands(main)
-    except ImportError:
-        pass  # Dev commands not available in production build
 
