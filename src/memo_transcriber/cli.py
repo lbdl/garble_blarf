@@ -13,6 +13,7 @@ from .database import MemoDatabase, get_user_data_dir
 from .model_config import TranscriptionModel, list_available_models, get_default_model
 from .voice_memos_printer import VoiceMemosPrinter
 from .cli_output import CliPrinter, OutputStyle
+from .printer import Printer
 
 def _get_db():
     """Get Voice Memos database path."""
@@ -69,41 +70,18 @@ def db_stats(db_path: Optional[str]) -> None:
         db = MemoDatabase(db_path)
         stats = db.get_processing_stats()
 
-        CliPrinter.section_start(f"Database: {db_path}", OutputStyle.STATS)
+        # Print header
+        Printer.print_db_stats_header(db_path)
 
-        # Transcription statistics
-        if 'transcriptions' in stats and stats['transcriptions']:
-            CliPrinter.blank_line()
-            CliPrinter.info("Transcription Summary:")
-            for status, data in stats['transcriptions'].items():
-                count = data['count']
-                avg_time = data.get('avg_time', 0) or 0
-                total_duration = data.get('total_duration', 0) or 0
-                CliPrinter.kv(f"{status.capitalize()}", f"{count} files", indent_level=1)
-                if avg_time > 0:
-                    CliPrinter.kv("Avg processing time", f"{avg_time:.2f}s", indent_level=2)
-                if total_duration > 0:
-                    CliPrinter.kv("Total audio duration", f"{total_duration/60:.1f} minutes", indent_level=2)
-        else:
-            CliPrinter.blank_line()
-            CliPrinter.info("No transcriptions found in database")
+        # Print transcription statistics
+        Printer.print_transcription_stats(stats)
 
-        # Export statistics
-        if 'exports' in stats and stats['exports']:
-            CliPrinter.blank_line()
-            CliPrinter.info("Export Summary:")
-            for status, data in stats['exports'].items():
-                count = data['count']
-                CliPrinter.kv(f"{status.capitalize()}", f"{count} files", indent_level=1)
-        else:
-            CliPrinter.blank_line()
-            CliPrinter.info("No exports recorded yet")
+        # Print export statistics
+        Printer.print_export_stats(stats)
 
-        # Get unexported count
+        # Print unexported count
         unexported = db.get_unexported_transcriptions()
-        if unexported:
-            CliPrinter.blank_line()
-            CliPrinter.info(f"Unexported transcriptions: {len(unexported)} files ready for export")
+        Printer.print_unexported_count(len(unexported))
 
     except Exception as e:
         CliPrinter.error("Error reading database", e)
@@ -123,68 +101,19 @@ def list_cached(db_path: Optional[str], status: Optional[str], limit: int, compa
         records = db.get_all_transcriptions(status_filter=status)
 
         if not records:
-            status_msg = f" with status '{status}'" if status else ""
-            print(f"No transcriptions found{status_msg}")
+            Printer.print_no_transcriptions_found(status)
             return
 
         # Limit results 0 == show all
         if len(records) > limit and limit != 0:
-            print(f"Showing first {limit} of {len(records)} records (use --limit to see more)")
+            Printer.print_list_limit_message(limit, len(records))
             records = records[:limit]
 
-        if compact:
-            # Compact view: just title (or first 5 words if untitled) and status
-            print(f"Cached Transcriptions ({len(records)} records):")
-            print("=" * 70)
-
-            for record in records:
-                # Check if title is generic "New Recording X" pattern
-                is_untitled = record.plain_title.startswith("New Recording")
-
-                if is_untitled and record.status == 'success' and record.transcription:
-                    # Show first ~5 words of transcription
-                    words = record.transcription.split()[:5]
-                    display_title = ' '.join(words) + ('...' if len(record.transcription.split()) > 5 else '')
-                else:
-                    display_title = record.plain_title
-
-                # Status emoji
-                status_emoji = {
-                    'success': '✅',
-                    'failed': '❌',
-                    'skipped': '⏭️'
-                }.get(record.status, '❓')
-
-                print(f"{status_emoji} {display_title} [{record.status}]")
-        else:
-            # Detailed view
-            print(f"Cached Transcriptions ({len(records)} records):")
-            print("=" * 70)
-
-            for record in records:
-                duration_min = (record.duration_seconds or 0) / 60.0
-                proc_time = record.processing_time_seconds or 0
-
-                print(f"\n📝 {record.plain_title}")
-                print(f"   UUID: {record.uuid}")
-                print(f"   Folder: {record.folder_name}")
-                print(f"   Status: {record.status}")
-                print(f"   Duration: {duration_min:.1f} min")
-                if proc_time > 0:
-                    print(f"   Processing time: {proc_time:.2f}s")
-                if record.model_used:
-                    print(f"   Model: {record.model_used}")
-                if record.processed_at:
-                    print(f"   Processed: {record.processed_at}")
-
-                if record.status == 'success' and record.transcription:
-                    preview = record.transcription[:100]
-                    print(f"   Preview: {preview}{'...' if len(record.transcription) > 100 else ''}")
-                elif record.status == 'failed' and record.error_message:
-                    print(f"   Error: {record.error_message}")
+        # Print the list of cached transcriptions
+        Printer.print_cached_list(records, compact=compact)
 
     except Exception as e:
-        print(f"Error reading database: {e}")
+        CliPrinter.error("Error reading database", e)
 
 @main.command()
 @click.option('--transcribe/--no-transcribe', default=True, help='Whether to transcribe audio files')
@@ -257,11 +186,8 @@ def export(export_format: str, output_dir: str, export_all: bool, force: bool, s
         # Initialize organiser with output directory
         organiser = MemoOrganiser(output=output_dir, db_path=db_path)
 
-        CliPrinter.header("Exporting transcriptions...", OutputStyle.EXPORT)
-        CliPrinter.kv("Format", export_format)
-        CliPrinter.kv("Output", output_dir)
-        CliPrinter.kv("Database", db_path)
-        CliPrinter.separator()
+        # Print header
+        Printer.print_export_header(export_format, output_dir, db_path)
 
         # Export transcriptions
         stats = organiser.export_transcriptions(
@@ -272,20 +198,10 @@ def export(export_format: str, output_dir: str, export_all: bool, force: bool, s
         )
 
         # Print summary
-        CliPrinter.blank_line()
-        CliPrinter.separator()
-        CliPrinter.header("Export Summary:", OutputStyle.STATS)
-        CliPrinter.kv("Total", stats['total'])
-        CliPrinter.kv("Exported", stats['exported'])
-        CliPrinter.kv("Skipped", stats['skipped'])
-        CliPrinter.kv("Failed", stats['failed'])
-
-        if stats['exported'] > 0:
-            CliPrinter.blank_line()
-            CliPrinter.success(f"Successfully exported {stats['exported']} files to {output_dir}")
+        Printer.print_export_summary(stats, output_dir)
 
     except Exception as e:
-        CliPrinter.error("Export failed", e)
+        Printer.print_export_error(e)
 
 
 # Load development commands if in dev mode

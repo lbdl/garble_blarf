@@ -13,6 +13,7 @@ from .voice_memos_printer import VoiceMemosPrinter
 from .transcriber import transcribe_file as transcribe_audio
 from .comparison import compare_transcriptions
 from .cli_output import CliPrinter, OutputStyle
+from .printer import Printer
 
 
 def _get_db() -> str:
@@ -121,30 +122,15 @@ def register_dev_commands(main_group: click.Group) -> None:
             db = MemoDatabase(str(db_path))
             stats = db.get_processing_stats()
 
-            CliPrinter.section_start(f"Test Database: {db_path}", OutputStyle.DATABASE)
+            # Print header with DATABASE emoji
+            Printer.print_db_stats_header(str(db_path), emoji=OutputStyle.DATABASE)
 
-            # Transcription statistics
-            if 'transcriptions' in stats and stats['transcriptions']:
-                CliPrinter.blank_line()
-                CliPrinter.info("Transcription Summary:")
-                for status, data in stats['transcriptions'].items():
-                    count = data['count']
-                    avg_time = data.get('avg_time', 0) or 0
-                    total_duration = data.get('total_duration', 0) or 0
-                    CliPrinter.kv(f"{status.capitalize()}", f"{count} files", indent_level=1)
-                    if avg_time > 0:
-                        CliPrinter.kv("Avg processing time", f"{avg_time:.2f}s", indent_level=2)
-                    if total_duration > 0:
-                        CliPrinter.kv("Total audio duration", f"{total_duration/60:.1f} minutes", indent_level=2)
-            else:
-                CliPrinter.blank_line()
-                CliPrinter.info("No transcriptions found in test database")
+            # Print transcription statistics
+            Printer.print_transcription_stats(stats)
 
-            # Get unexported count
+            # Print unexported count
             unexported = db.get_unexported_transcriptions()
-            if unexported:
-                CliPrinter.blank_line()
-                CliPrinter.info(f"Unexported transcriptions: {len(unexported)} files ready for export")
+            Printer.print_unexported_count(len(unexported))
 
         except Exception as e:
             CliPrinter.error("Error reading test database", e)
