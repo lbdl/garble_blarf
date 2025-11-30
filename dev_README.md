@@ -114,11 +114,6 @@ git push origin dev
 git branch -d hotfix/critical-bug-description
 ```
 
-**Why this approach:**
-- Fast path to production (fix on main directly)
-- Simple sync (merge `main` → `dev`)
-- No risk of forgetting to sync (just merge, no cherry-picking)
-
 ## Git Attributes Merge Protection
 
 The `.gitattributes` file on `main` contains:
@@ -175,7 +170,6 @@ exclude = [
     ".dev"
 ]
 ```
-No `dev_tools/**` exclusion needed since directory doesn't exist.
 
 **On `dev`:**
 ```toml
@@ -285,8 +279,6 @@ cd ../memo-transcriber-dev
 
 ## Resources
 
-- **Full migration details:** See `branch_refactor.md`
-- **Project overview:** See `.claude/context.md`
 - **User documentation:** See `README.md`
 - **CLI help:** Run `memo-transcriber --help` or `comparator --help`
 
